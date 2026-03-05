@@ -1,0 +1,197 @@
+import torch
+from torch.utils.data import Dataset, Subset
+from torchvision import datasets, transforms
+import numpy as np
+from collections import defaultdict
+
+def load_cifar10(root="./data"):
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+    ])
+
+    train_dataset = datasets.CIFAR10(
+        root=root,
+        train=True,
+        download=True,
+        transform=transform,
+    )
+
+    test_dataset = datasets.CIFAR10(
+        root=root,
+        train=False,
+        download=True,
+        transform=transform,
+    )
+
+    # Stack all images
+    X_train = torch.stack([train_dataset[i][0] for i in range(len(train_dataset))])
+    X_test = torch.stack([test_dataset[i][0] for i in range(len(test_dataset))])
+
+    # Concatenate along sample dimension
+    X = torch.cat([X_train, X_test], dim=0)
+
+    # Labels
+    y_train = torch.tensor(train_dataset.targets)
+    y_test = torch.tensor(test_dataset.targets)
+    y = torch.cat([y_train, y_test], dim=0)
+
+    return X, y
+
+
+def split_client_data(X_i, y_i, n_samples, n_samples_val, rng):
+    """
+    Split per-client data preserving class proportions approximately,
+    but limit total samples to n_samples + n_samples_val.
+    """
+    N = n_samples + n_samples_val
+
+    # Global index pool
+    all_idxs = np.arange(len(X_i))
+
+    X_train, X_val, y_train, y_val = [], [], [], []
+    
+    # Get class proportions for client
+    classes, counts = np.unique(y_i, return_counts=True) # e.g. (array([0, 1, 2, 3, 4]), array([3, 3, 2, 1, 1]))
+    proportions = counts / counts.sum()
+    
+    # Allocate number of samples per class based on proportions
+    n_per_class = (proportions * N).astype(int)
+    # Fix rounding mismatch
+    diff = N - n_per_class.sum()
+    if diff != 0:
+        adjust_classes = rng.choice(len(n_per_class), size=abs(diff), replace=True)
+        for i in adjust_classes:
+            n_per_class[i] += np.sign(diff)
+    # remove negative sample count
+    n_per_class = np.clip(n_per_class, 0, None)
+    used_idxs = set()
+
+    # Sample per class
+    for c, n_c_target in zip(classes, n_per_class):
+        idxs_c = np.where(y_i == c)[0]
+        rng.shuffle(idxs_c)
+        idxs_c = idxs_c[:n_c_target]
+
+        used_idxs.update(idxs_c.tolist())
+
+        n_train_c = int(len(idxs_c) * n_samples / N)
+
+        X_train.append(X_i[idxs_c[:n_train_c]])
+        y_train.append(y_i[idxs_c[:n_train_c]])
+
+        X_val.append(X_i[idxs_c[n_train_c:]])
+        y_val.append(y_i[idxs_c[n_train_c:]])
+
+    # account for zero sample class with np.empty
+    X_train = np.concatenate(X_train) if X_train else np.empty((0, X_i.shape[1]))
+    y_train = np.concatenate(y_train) if y_train else np.empty((0,), dtype=y_i.dtype)
+
+    X_val = np.concatenate(X_val) if X_val else np.empty((0, X_i.shape[1]))
+    y_val = np.concatenate(y_val) if y_val else np.empty((0,), dtype=y_i.dtype)
+
+    # Remaining unused indices
+    remaining_idxs = np.array(list(set(all_idxs) - used_idxs))
+    rng.shuffle(remaining_idxs)
+
+    # Top up train set
+    if len(X_train) < n_samples:
+        needed = n_samples - len(X_train)
+        extra = remaining_idxs[:needed]
+        remaining_idxs = remaining_idxs[needed:]
+
+        X_train = np.concatenate([X_train, X_i[extra]])
+        y_train = np.concatenate([y_train, y_i[extra]])
+
+    # Top up validation set
+    if len(X_val) < n_samples_val:
+        needed = n_samples_val - len(X_val)
+        extra = remaining_idxs[:needed]
+
+        X_val = np.concatenate([X_val, X_i[extra]])
+        y_val = np.concatenate([y_val, y_i[extra]])
+
+    return X_train[:n_samples], X_val[:n_samples_val], y_train[:n_samples], y_val[:n_samples_val]
+
+import numpy as np
+import torch
+from torch.utils.data import Subset, DataLoader
+
+def cifar10_label_skew(
+    dataset,
+    n_clients=100,
+    n_samples=100,
+    n_samples_val=500,
+    alpha=1,
+    seed=42,
+):
+    """
+    Split CIFAR-10 training dataset into client-specific subsets
+    using Dirichlet label skew.
+    """
+    rng = np.random.default_rng(seed)
+
+    X, y = dataset
+    # Extract labels
+    y = np.array(y)
+    n_classes = len(np.unique(y))
+
+    # Group indices by class
+    indices_by_class = {k: np.where(y == k)[0] for k in range(n_classes)}
+
+    # Shuffle indices within each class
+    for idxs in indices_by_class.values():
+        rng.shuffle(idxs)
+
+    for _ in range(20):  # attempt up to 20 times
+        client_indices = [[] for _ in range(n_clients)]
+        label_counts = np.zeros((n_clients, n_classes))
+
+        # Distribute each class across clients
+        for k in range(n_classes):
+            idxs = indices_by_class[k]
+            proportions = rng.dirichlet([alpha] * n_clients)
+
+            split_points = (np.cumsum(proportions) * len(idxs)).astype(int)[:-1]
+            split_idxs = np.split(idxs, split_points)
+
+            for client_id, idx_set in enumerate(split_idxs):
+                client_indices[client_id].extend(idx_set.tolist())
+                label_counts[client_id, k] = len(idx_set)
+
+        # Ensure minimum samples per client
+        if all(len(idxs) >= n_samples + n_samples_val for idxs in client_indices):
+            break
+    else:
+        raise ValueError("Failed to generate valid client splits after 20 attempts.")
+
+    # Normalize label proportions
+    label_proportions = label_counts / label_counts.sum(axis=1, keepdims=True)
+
+    # ------------------------------------------------------------------
+    # Create per-client train/val subsets
+    # ------------------------------------------------------------------
+    client_train_datasets = []
+    client_val_datasets = []
+
+    for idxs in client_indices:
+        idxs = np.array(idxs)
+        rng.shuffle(idxs)
+
+        train_idxs = idxs[:n_samples]
+        val_idxs = idxs[n_samples:n_samples + n_samples_val]
+
+        client_train_datasets.append(Subset(dataset, train_idxs.tolist()))
+        client_val_datasets.append(Subset(dataset, val_idxs.tolist()))
+
+    return client_train_datasets, client_val_datasets, label_proportions
+
+
+def get_client_loaders(
+    client_datasets,
+    batch_size=32,
+    shuffle=True,
+):
+    return [
+        DataLoader(ds, batch_size=batch_size, shuffle=shuffle)
+        for ds in client_datasets
+    ]

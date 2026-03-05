@@ -1,0 +1,42 @@
+# options.py
+import argparse
+from registry import MODELS, DATASETS, ALGOS
+
+def read_options():
+    parser = argparse.ArgumentParser()
+
+    # dynamically populate choices from registries
+    parser.add_argument(
+        "--model",
+        type=str,
+        choices=list(MODELS.keys()),
+        default="linreg",  
+        help="model to use"
+    )
+
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        choices=list(DATASETS.keys()),
+        default="synthetic",
+        help="dataset to use"
+    )
+
+    parser.add_argument(
+        "--algo",
+        type=str,
+        choices=list(ALGOS.keys()),
+        default="persfl",
+        help="federated algorithm to use"
+    )
+
+    # generic options
+    parser.add_argument("--R", type=int, default=10)
+    parser.add_argument("--lrate", type=float, default=0.1)
+    parser.add_argument("--n_clients", type=int, default=None)
+    parser.add_argument("--batch_size", type=int, default=10)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--reps", type=int, default=1)
+
+    args = parser.parse_args()
+    return vars(args)
