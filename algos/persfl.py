@@ -3,7 +3,7 @@ import copy
 from torch import nn
 
 class PersFL:
-    def __init__(self, model_fn, loss_fn, R=50, S=20, lrate=0.01, optimizer_cls=torch.optim.SGD, device='cpu', **kwargs):
+    def __init__(self, model_fn, loss_fn, R=50, S=20, lrate=0.01, device='cpu', **kwargs):
         """
         PersFL Algorithm
 
@@ -13,7 +13,6 @@ class PersFL:
             R: number of iterations
             S: number of candidate neighbors per client
             lrate: learning rate
-            optimizer_cls: torch optimizer class
             device: 'cpu' or 'cuda'
             kwargs: additional algorithm-specific parameters
         """
@@ -22,7 +21,6 @@ class PersFL:
         self.R = R
         self.S = S
         self.lrate = lrate
-        self.optimizer_cls = optimizer_cls
         self.device = device
         self.kwargs = kwargs
 
@@ -54,21 +52,18 @@ class PersFL:
         device = self.device
         n_clients, _, d = X_train.shape
 
-        X_train = torch.tensor(X_train, dtype=torch.float32, device=device)
+        X_train = torch.as_tensor(X_train, dtype=torch.float32, device=device)
         y_train = torch.tensor(y_train, dtype=torch.float32, device=device)
 
         # Initialize client models
         self.client_models = []
         for _ in range(n_clients):
             model = self.model_fn().to(device)
-            nn.init.zeros_(model.linear.weight)
             self.client_models.append(model)
 
         self.loss_history = torch.zeros((n_clients, self.R), device=device)
         self.MSE = torch.zeros(self.R, device=device)
 
-        X_train = X_train.to(device)
-        y_train = y_train.to(device)
         if cluster_labels is not None:
             cluster_labels = torch.tensor(cluster_labels, device=device)
         if true_weights is not None:
@@ -76,12 +71,15 @@ class PersFL:
 
         # Main iteration loop
         for r in range(self.R):
-            # Step 1: sample candidate neighbors
-            # candidate_indices = torch.randint(0, n_clients-1, (n_clients, self.S), device=device) # (n_clients, S)
-            candidate_list = [torch.randperm(n_clients-1, device=device)[:self.S] for _ in range (n_clients)]                   
-            candidate_indices = torch.stack(candidate_list, dim=0)
-            # shift indices to exclude node itself
-            candidate_indices = candidate_indices + (candidate_indices >= torch.arange(n_clients, device=device).unsqueeze(1)).long()
+            # Step 1: sample candidate neighbors (exclude self)
+            candidate_indices = []
+            for i in range(n_clients):
+                pool = torch.cat([
+                    torch.arange(0, i, device=device),
+                    torch.arange(i+1, n_clients, device=device)
+                ])
+                idx = pool[torch.randperm(n_clients-1, device=device)[:self.S]]
+                candidate_indices.append(idx)
 
             # Step 2: compute candidate updates
             all_candidate_params = []
@@ -115,81 +113,54 @@ class PersFL:
     # Helper methods
     # --------------------------------
     def weight_update(self, model, X_candidates, y_candidates):
-        """Compute candidate updates for one client"""
-        S = X_candidates.shape[0]
+        """
+        Compute candidate updates for one client using functional gradient steps.
+
+        Args:
+            model: nn.Module, current client model
+            X_candidates: Tensor[S, m_i, C, H, W] - inputs for candidate neighbors
+            y_candidates: Tensor[S, m_i, ...] - labels for candidate neighbors
+
+        Returns:
+            candidate_params: list of S dicts with cloned parameter tensors
+        """
         device = self.device
+        S = X_candidates.shape[0]
         candidate_params = []
 
+        # --- 1. Store base model parameters as clones ---
+        base_params = [p.clone() for p in model.parameters()]
+        param_names = list(model.state_dict().keys())
+
+        # Ensure model does not modify running stats for candidates
+        model.eval()  # freeze batchnorm/dropout stats
+
         for i in range(S):
-            # send params to neighbours
-            model_candidate = copy.deepcopy(model).to(device)
-            optimizer = self.optimizer_cls(model_candidate.parameters(), lr=self.lrate)
-            model_candidate.train()
+            # Forward pass for candidate i
+            # on candidate neighbor's data
+            pred = model(X_candidates[i])
+            loss = self.loss_fn(pred, y_candidates[i])
 
-            optimizer.zero_grad()
-            X = X_candidates[i]
-            y = y_candidates[i]
-            pred = model_candidate(X)
-            loss = self.loss_fn(pred, y)
-            loss.backward()
-            # for p in model_candidate.parameters():
-            #     print(p.grad)
-            optimizer.step()
+            # Compute gradients w.r.t. current parameters (decoupled)
+            grads = torch.autograd.grad(loss, model.parameters(), create_graph=False)
 
-            candidate_params.append({name: param.detach().clone() for name, param in model_candidate.named_parameters()})
+            # Manual SGD / minibatch update: functional update without touching model
+            updated_params = [p - self.lrate * g for p, g in zip(base_params, grads)]
+
+            # Store updated candidate weights as independent cloned state_dict
+            candidate_params.append({
+                name: p.clone()
+                for name, p in zip(param_names, updated_params)
+            })
+
+        # Restore model to original parameters
+        for p, bp in zip(model.parameters(), base_params):
+            p.data.copy_(bp)
+
+        # Return model to train mode if needed for evaluation later
+        model.train()
 
         return candidate_params
-    
-# def weight_update_batched(self, model, X_candidates, y_candidates):
-    # """
-    # General batched update for ANY model (MLP, CNN, etc.)
-    # X_candidates: (S, ...)
-    # y_candidates: (S, ...)
-    # """
-    # device = self.device
-    # S = X_candidates.shape[0]
-
-    # # Extract base params & buffers
-    # base_params = dict(model.named_parameters())
-    # base_buffers = dict(model.named_buffers())
-
-    # # Stack parameters: (S, ...)
-    # params = {
-    #     k: v.detach().clone().unsqueeze(0).repeat(S, *([1] * v.dim()))
-    #     for k, v in base_params.items()
-    # }
-
-    # buffers = {
-    #     k: v.unsqueeze(0).repeat(S, *([1] * v.dim()))
-    #     for k, v in base_buffers.items()
-    # }
-
-    # # Enable gradients
-    # for p in params.values():
-    #     p.requires_grad_(True)
-
-    # # Vectorized loss over S candidates
-    # batched_loss = vmap(
-    #     lambda p, b, X, y: single_candidate_loss(
-    #         p, b, model, X, y, self.loss_fn
-    #     )
-    # )
-
-    # losses = batched_loss(params, buffers, X_candidates, y_candidates)
-    # losses.sum().backward()
-
-    # # SGD update
-    # with torch.no_grad():
-    #     for k in params:
-    #         params[k] -= self.lrate * params[k].grad
-
-    # # Return list of parameter dicts
-    # candidate_params = [
-    #     {k: params[k][i].detach().clone() for k in params}
-    #     for i in range(S)
-    # ]
-
-    # return candidate_params
 
     def candidate_losses(self, client_model, candidate_params, X_client, y_client):
         """Evaluate candidates on a single client"""
@@ -197,14 +168,14 @@ class PersFL:
         S = len(candidate_params)
         losses = torch.zeros(S, device=device)
 
-        X_client = X_client.to(device)
-        y_client = y_client.to(device)
+        # save client's current params to restore later
+        base_state = {k: v.clone() for k, v in client_model.state_dict().items()}
 
         for i, params in enumerate(candidate_params):
-            model = copy.deepcopy(client_model)
-            model.load_state_dict(params)
-            model.eval()
+            client_model.load_state_dict(params)
+            client_model.eval()
             with torch.no_grad():
-                pred = model(X_client)
-                losses[i] = self.loss_fn(pred, y_client)
+                pred = client_model(X_client)
+                losses[i] = self.loss_fn(pred.squeeze(), y_client.squeeze())
+        client_model.load_state_dict(base_state)
         return losses

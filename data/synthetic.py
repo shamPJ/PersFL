@@ -24,8 +24,7 @@ def generate_data(n_clusters, n_clients, n_samples, n_features, noise_scale=1.0)
 
     """
 
-    assert n_clients % n_clusters == 0, \
-    "n_clients must be divisible by n_clusters"
+    assert n_clients % n_clusters == 0, "n_clients must be divisible by n_clusters"
 
     # equal n.o. clients per cluster
     n_ds = int(n_clients / n_clusters)

@@ -22,7 +22,8 @@ class AlgoSpec:
 
 # Registries
 MODELS = {
-    "linreg": ModelSpec(module="model.linreg", cls="LinReg", default_params={"n_features": 2, "bias": False})
+    "linreg": ModelSpec(module="model.linreg", cls="LinReg", default_params={"n_features": 2, "bias": False}),
+    "cnn": ModelSpec(module="model.cnn", cls="CNN", default_params={"input_shape": (3, 32, 32), "num_classes": 10})
 }
 
 DATASETS = {

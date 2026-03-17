@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=hetfl_gmm
 #SBATCH --time=04:00:00
-#SBATCH --mem=8G
-#SBATCH --cpus-per-task=10
+#SBATCH --mem=16G
+#SBATCH --cpus-per-task=2 # task is job instance created from the array; each task runs .sh independently
 #SBATCH --gres=gpu:1
 #SBATCH --array=0-39
 #SBATCH --output=logs/out_%A_%a.out
@@ -18,7 +18,7 @@ source activate pytorch-env
 # Sweep grids
 # ===============================
 # Sweep parameters
-D_LIST=(2 10 50 100)         # for sweep 1 (vary n_clients)
+D_LIST=(2 10 50 100)         # data dimensionality grid
 SEEDS=(0 1 2 3 4 5 6 7 8 9)  # repetitions
 
 # ===============================

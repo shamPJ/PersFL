@@ -1,0 +1,11 @@
+iter,mse,loss_mean,data_n_clusters,data_n_clients,data_n_samples,data_n_features,data_noise_scale,model_n_features,model_bias,algo_loss_fn,algo_lrate,algo_S,algo_R
+0,5.3991446,56.125267,2,10,10,10,0,10,False,MSELoss(),0.1,20,10
+1,3.568226,33.612682,2,10,10,10,0,10,False,MSELoss(),0.1,20,10
+2,2.32438,21.592968,2,10,10,10,0,10,False,MSELoss(),0.1,20,10
+3,1.6094979,14.697803,2,10,10,10,0,10,False,MSELoss(),0.1,20,10
+4,1.1327643,10.568943,2,10,10,10,0,10,False,MSELoss(),0.1,20,10
+5,0.8862929,7.69618,2,10,10,10,0,10,False,MSELoss(),0.1,20,10
+6,0.6818628,5.859393,2,10,10,10,0,10,False,MSELoss(),0.1,20,10
+7,0.5376879,4.442437,2,10,10,10,0,10,False,MSELoss(),0.1,20,10
+8,0.44302306,3.4813848,2,10,10,10,0,10,False,MSELoss(),0.1,20,10
+9,0.3661137,2.794745,2,10,10,10,0,10,False,MSELoss(),0.1,20,10

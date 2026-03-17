@@ -1,13 +1,41 @@
+import glob
+
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import glob
+import os
 
 # Load CSV (optional if you already have `rows` list)
-df = pd.read_csv("experiment_results.csv")
+# df = pd.read_csv("experiment_results.csv")
+
+import glob
+import os
+import pandas as pd
+
+csvs = glob.glob(os.path.join("results/linear_syn_dm", "linear_syn_dm_*.csv"))
+
+dfs = []
+for f in csvs:
+    # extract filename
+    fname = os.path.basename(f)
+    
+    # remove prefix and suffix
+    core = fname.replace("linear_syn_dm_", "").replace(".csv", "")
+    # split into parts
+    D, SEED = core.split("_")
+    # read file
+    tmp = pd.read_csv(f)
+    # add variables
+    tmp["seed"] = int(SEED)
+    
+    dfs.append(tmp)
+
+df = pd.concat(dfs, ignore_index=True)
 
 dims = sorted(df['data_n_features'].unique())  # e.g., [2, 10]
 R = df['iter'].max() + 1                      # number of rounds
-reps = df['rep'].max() + 1                     # number of repetitions
+reps = df['seed'].max() + 1                     # number of repetitions
 
 mean_mse = []
 sem_mse = []
@@ -46,6 +74,6 @@ plt.title('PersFL MSE vs n_features')
 plt.legend(frameon=False)
 plt.grid(True)
 plt.tight_layout()
-plt.savefig("MSE_vs_nfeatures.png", dpi=300)
+plt.savefig("MSE_vs_nfeatures_updated.png", dpi=300)
 plt.show()
 plt.close()
