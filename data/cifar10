@@ -3,6 +3,7 @@ from torch.utils.data import Dataset, Subset
 from torchvision import datasets, transforms
 import numpy as np
 from collections import defaultdict
+from torch.utils.data import Subset, DataLoader
 
 def load_cifar10(root="./data"):
     transform = transforms.Compose([
@@ -111,10 +112,6 @@ def split_client_data(X_i, y_i, n_samples, n_samples_val, rng):
         y_val = np.concatenate([y_val, y_i[extra]])
 
     return X_train[:n_samples], X_val[:n_samples_val], y_train[:n_samples], y_val[:n_samples_val]
-
-import numpy as np
-import torch
-from torch.utils.data import Subset, DataLoader
 
 def cifar10_label_skew(
     dataset,

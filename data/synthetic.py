@@ -1,5 +1,6 @@
 import numpy as np
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
 def generate_data(n_clusters, n_clients, n_samples, n_samples_val, n_features, noise_weight=0, noise_scale=1.0, seed=0):
     
@@ -45,7 +46,7 @@ def generate_data(n_clusters, n_clients, n_samples, n_samples_val, n_features, n
         w = rng.uniform(-5, 5, size=(n_features, 1))
         true_weights[i] = w.reshape(-1,)
 
-        for j in range(n_ds):
+        for _ in range(n_ds):
             # Sample datapoints from multivar Gaussian ~N(0,I)
             X = rng.normal(0, 1, size=(n_samples + n_samples_val, n_features))
             
@@ -59,6 +60,12 @@ def generate_data(n_clusters, n_clients, n_samples, n_samples_val, n_features, n
 
             # Split train vs val
             X_t, X_v, y_t, y_v = train_test_split(X, y, train_size=n_samples, test_size=n_samples_val, random_state=seed+node_id)
+
+            # Normalize per client
+            scaler = StandardScaler()
+            X_t = scaler.fit_transform(X_t)
+            X_v = scaler.transform(X_v)
+
             X_train[node_id] = X_t
             y_train[node_id] = y_t
             

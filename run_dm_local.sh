@@ -1,7 +1,7 @@
 #!/bin/bash
 
 D_LIST=(2)
-SEEDS=(0 1 2 3 4 5 6 7 8 9)
+SEEDS=(0 1 2 3)
 
 # Output directory
 OUT_DIR="results/linear_syn_dm"
@@ -30,7 +30,7 @@ for D in "${D_LIST[@]}"; do
             --dataset synthetic \
             --algo persfl \
             --R 1500 \
-            --lrate 0.03 \
+            --lrate 0.01 \
             --S 30 \
             --fname $F_PATH \
             --device cpu \

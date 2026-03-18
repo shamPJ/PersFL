@@ -21,6 +21,10 @@ source activate pytorch-env
 D_LIST=(2 10 50 100)         # data dimensionality grid
 SEEDS=(0 1 2 3 4 5 6 7 8 9)  # repetitions
 
+# Output directory
+OUT_DIR="results/linear_syn_dm"
+mkdir -p $OUT_DIR logs
+
 # ===============================
 # Index mapping
 # ===============================
@@ -48,17 +52,19 @@ echo "========================================"
 # Run experiment
 # ===============================
 srun python main.py \
+    --n_clients 150 \
+    --n_clusters 3 \
     --n_features $D \
-    --seed $SEED \
-    --n_clients 100 \
     --model linreg \
     --dataset synthetic \
     --algo persfl \
     --R 1500 \
-    --lrate 0.03 \
-    --S 20 \
-    --fname "results_dm_D${D}_seed${SEED}.csv" \
-    --device cuda 
+    --lrate 0.01 \
+    --S 30 \
+    --fname ${OUT_DIR}/linear_syn_dm_${D}_${SEED}.csv \
+    --device cuda \
+    --problem regression \
+    --seed $SEED 
 
 
 
