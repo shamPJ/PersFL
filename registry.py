@@ -1,6 +1,9 @@
+from algos.flavg import FedAvg
+import torch
 from dataclasses import dataclass
 from torch import nn
 from typing import Dict, Any
+from utils.metrics import MSE, MSE_params, accuracy, F1
 
 @dataclass
 class ModelSpec:
@@ -31,6 +34,7 @@ DATASETS = {
         "n_clusters": 2,
         "n_clients": 100,
         "n_samples": 10,
+        "n_samples_val": 500,
         "n_features": 2,
         "noise_scale": 0
     })
@@ -38,8 +42,12 @@ DATASETS = {
 
 ALGOS = {
     "persfl": AlgoSpec(module="algos.persfl", cls="PersFL", default_params={
-        "loss_fn": nn.MSELoss(), 
         "lrate": 0.03,
-        "S": 20,
+        "S": 30,
+        "R": 1500}),
+    
+    "fedavg": AlgoSpec(module="algos.fedavg", cls="FedAvg", default_params={
+        "lrate": 0.03,
+        "S": 30,
         "R": 1500})
 }

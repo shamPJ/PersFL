@@ -1,9 +1,11 @@
 import torch
-import copy
+import numpy as np
+import random
 from torch import nn
+from utils.metrics import MSE, MSE_params, accuracy, F1
 
 class PersFL:
-    def __init__(self, model_fn, loss_fn, R=50, S=20, lrate=0.01, device='cpu', **kwargs):
+    def __init__(self, model_fn, loss_fn, metrics={"MSE_val": MSE}, R=50, S=20, lrate=0.01, device='cpu', seed=None):
         """
         PersFL Algorithm
 
@@ -18,17 +20,35 @@ class PersFL:
         """
         self.model_fn = model_fn
         self.loss_fn = loss_fn
+        self.metrics = metrics
         self.R = R
         self.S = S
         self.lrate = lrate
         self.device = device
-        self.kwargs = kwargs
-
+        self.seed = seed
+        
         # client models initialized later
         self.client_models = None
-        self.loss_history = None # training loss (n_clients, R)
-        self.MSE = None # param est. error ||true_param - est.param||_2^2 aver. across clients (R,)
+        self.loss_history = None # training loss as torch tensor (n_clients, R)
+        self.metrics_history = {name: torch.zeros(self.R, device=self.device) for name in metrics.keys()}
 
+    def set_seed(self):
+        if self.seed is not None:
+            random.seed(self.seed)
+            np.random.seed(self.seed)
+            torch.manual_seed(self.seed)
+            if self.device != 'cpu':
+                torch.cuda.manual_seed_all(self.seed)
+
+    def get_predictions(self, model, X):
+        was_training = model.training
+        model.eval()
+        with torch.no_grad():
+            out = model(X)
+        if was_training:
+            model.train()
+        return out
+        
     # --------------------------------
     # Run method: 
     # --------------------------------
@@ -44,8 +64,10 @@ class PersFL:
         Returns:
             client_models: list of nn.Module
         """
+        self.set_seed()
 
         X_train, y_train = data["train"]
+        X_val, y_val = data["val"] 
         cluster_labels = data.get("cluster_labels", None)
         true_weights = data.get("true_weights", None)
 
@@ -54,6 +76,8 @@ class PersFL:
 
         X_train = torch.as_tensor(X_train, dtype=torch.float32, device=device)
         y_train = torch.tensor(y_train, dtype=torch.float32, device=device)
+        X_val = torch.as_tensor(X_val, dtype=torch.float32, device=device)
+        y_val = torch.tensor(y_val, dtype=torch.float32, device=device)
 
         # Initialize client models
         self.client_models = []
@@ -62,7 +86,6 @@ class PersFL:
             self.client_models.append(model)
 
         self.loss_history = torch.zeros((n_clients, self.R), device=device)
-        self.MSE = torch.zeros(self.R, device=device)
 
         if cluster_labels is not None:
             cluster_labels = torch.tensor(cluster_labels, device=device)
@@ -78,7 +101,7 @@ class PersFL:
                     torch.arange(0, i, device=device),
                     torch.arange(i+1, n_clients, device=device)
                 ])
-                idx = pool[torch.randperm(n_clients-1, device=device)[:self.S]]
+                idx = pool[torch.randperm(n_clients - 1, device=device)[:self.S]]
                 candidate_indices.append(idx)
 
             # Step 2: compute candidate updates
@@ -90,8 +113,9 @@ class PersFL:
                 candidate_params = self.weight_update(self.client_models[i], candidates_X, candidates_y)
                 all_candidate_params.append(candidate_params)
 
-            # Step 3: evaluate candidates and select best
-            mse_list = [] # param. est. error list
+            # Step 3: evaluate candidates and select best param. est. error list
+            # initialize accumulators per metric
+            metrics_sums = {name: torch.tensor(0.0, device=device) for name in self.metrics.keys()}
             for i in range(n_clients):
                 losses = self.candidate_losses(self.client_models[i], all_candidate_params[i], X_train[i], y_train[i])
                 best_idx = torch.argmin(losses)
@@ -99,13 +123,28 @@ class PersFL:
                 self.client_models[i].load_state_dict(best_w)
                 self.loss_history[i, r] = losses[best_idx]
 
-                if cluster_labels is not None and true_weights is not None:
-                    cluster_id = cluster_labels[i]
-                    param_tensor = list(best_w.values())[0]
-                    mse_list.append((true_weights[cluster_id] - torch.squeeze(param_tensor)) ** 2)  
+                # -----------------------------
+                # Evaluate metrics for this iteration
+                # -----------------------------
+                val_predictions = None # cache val predictions if needed for multiple metrics
+                for metric_name, metric_fn in self.metrics.items():
+                    if metric_name == "MSE_params":
+                        # only for linear models
+                        cluster_id = cluster_labels[i]
+                        param_tensor = list(best_w.values())[0]
+                        if true_weights is None or cluster_labels is None:
+                            raise ValueError("MSE_params requires both true_weights and cluster_labels")
+                        # out is scalar tensor
+                        metric_value = metric_fn(torch.squeeze(param_tensor), true_weights[cluster_id])
+                    else:
+                        if val_predictions is None:
+                            val_predictions = self.get_predictions(self.client_models[i], X_val[i])
+                        metric_value = metric_fn(val_predictions, y_val[i])
+                    
+                    metrics_sums[metric_name] += metric_value.detach()
 
-            if cluster_labels is not None and true_weights is not None:
-                self.MSE[r] = torch.mean(torch.stack(mse_list))
+            for metric_name in self.metrics.keys():
+                self.metrics_history[metric_name][r] = metrics_sums[metric_name] / n_clients
 
         return self.client_models
 

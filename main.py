@@ -1,6 +1,8 @@
 from registry import MODELS, DATASETS, ALGOS
+from utils.metrics import MSE, MSE_params, accuracy, F1
 from options import read_options
 from itertools import product
+from torch import nn
 import pandas as pd
 import importlib
 import torch
@@ -23,12 +25,25 @@ def merge_defaults(defaults, overrides):
     # value is returned if key doesnt exist
     return {k: overrides.get(k, v) for k, v in defaults.items()}
 
+# flatten dicts
+def flatten_dict(d, parent_key=''):
+    items = []
+    for k, v in d.items():
+        key = f"{parent_key}_{k}" if parent_key else k
+        if isinstance(v, dict):
+            items.extend(flatten_dict(v, key).items())
+        else:
+            items.append((key, v))
+    return dict(items)
+
 if __name__ == "__main__":
     
     parsed = read_options()
     fname = parsed["fname"]
 
     device = torch.device(parsed["device"])
+    R = parsed["R"]
+    seed = parsed["seed"]
 
     model_spec = MODELS[parsed["model"]] # choose dataset, model, algo from user input or default vals
     data_spec = DATASETS[parsed["dataset"]] # e.g. 'linreg', 'synthetic', 'persfl'; corresponds to .py files
@@ -49,27 +64,59 @@ if __name__ == "__main__":
     print("Model params:", full_model_params)
     print("Algo params:", full_algo_params)
 
-    # create a new instance of a model
+    # -----------------------------
+    # Detect problem type
+    # -----------------------------
+    if parsed.get("problem"):
+        problem_type = parsed["problem"]
+    else:
+        problem_type = getattr(data_spec, "problem_type", "regression")  # fallback
+
+    print(f"Detected problem type: {problem_type}")
+
+    # -----------------------------
+    # Choose metrics automatically
+    # -----------------------------
+    metrics = {}
+    if problem_type == "regression":
+        loss_fn = nn.MSELoss()
+        metrics = {"MSE_val": MSE, "MSE_params": MSE_params}
+
+    elif problem_type == "classification":
+        loss_fn = nn.CrossEntropyLoss()
+        metrics = {"accuracy": accuracy, "F1": F1}
+
+    # -----------------------------
+    # Model factory
+    # -----------------------------
     def model_fn():
         return ModelCls(**full_model_params)
-    
-    # flatten dicts
-    def flatten_dict(d, parent_key=''):
-        items = []
-        for k, v in d.items():
-            key = f"{parent_key}_{k}" if parent_key else k
-            if isinstance(v, dict):
-                items.extend(flatten_dict(v, key).items())
-            else:
-                items.append((key, v))
-        return dict(items)
 
+    # -----------------------------
+    # Load dataset
+    # -----------------------------
     data = DataCls(**full_data_params)
-    algo = AlgoCls(model_fn=model_fn, device=device, **full_algo_params) # init fed algo
-    final_model = algo.run(data)
 
-    # collect metrics
-    mse = algo.MSE.detach().cpu().numpy()          # shape = (R,)
+    # -----------------------------
+    # Initialize federated algorithm
+    # -----------------------------
+    algo = AlgoCls(
+        model_fn=model_fn,
+        loss_fn=loss_fn, 
+        metrics=metrics, 
+        device=device,
+        seed=seed,
+        **full_algo_params
+    )
+
+    # -----------------------------
+    # Run federated learning
+    # -----------------------------
+    final_models = algo.run(data)
+
+    # -----------------------------
+    # Collect metrics
+    # -----------------------------
     loss_hist = algo.loss_history.detach().cpu().numpy()  # shape = (n_clients, R)
     
     # save data 
@@ -78,12 +125,16 @@ if __name__ == "__main__":
     flat_algo  = flatten_dict(full_algo_params, parent_key="algo")
 
     rows = []
-    for r in range(len(mse)):
+    for r in range(R):
         row = {
             "iter": r,
-            "mse": mse[r],
             "loss_mean": loss_hist[:, r].mean()
         }
+
+        # Add metrics from dictionary of tensors algo.metrics_history if it exists
+        if hasattr(algo, "metrics_history") and algo.metrics_history is not None:
+            for metric_name, metric_tensor in algo.metrics_history.items():
+                row[metric_name] = metric_tensor[r].item()  # convert each value to Python scalar
 
         row.update(flat_data)
         row.update(flat_model)

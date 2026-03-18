@@ -1,6 +1,7 @@
 #!/bin/bash
 
-D_LIST=(2)
+D_LIST=(2 10 50 100)
+# D_LIST=(2 10)
 SEEDS=(0 1 2 3 4 5 6 7 8 9)
 
 # Output directory
@@ -27,6 +28,7 @@ for D in "${D_LIST[@]}"; do
             --n_clusters 3 \
             --n_features $D \
             --model linreg \
+            
             --dataset synthetic \
             --algo persfl \
             --R 1500 \
@@ -34,7 +36,6 @@ for D in "${D_LIST[@]}"; do
             --S 30 \
             --fname $F_PATH \
             --device cpu \
-            --problem regression \
             --seed $SEED
 
         END_EXP=$SECONDS
