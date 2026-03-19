@@ -52,15 +52,15 @@ echo "========================================"
 # Run experiment
 # ===============================
 srun python main.py \
-    --n_clients 100 \
-    --n_clusters 2 \
+    --n_clients 150 \
+    --n_clusters 3 \
     --n_features $D \
     --model linreg \
     --dataset synthetic \
     --algo persfl \
     --R 1500 \
-    --lrate 0.03 \
-    --S 20 \
+    --lrate 0.01 \
+    --S 30 \
     --fname ${OUT_DIR}/linear_syn_dm_${D}_${SEED}.csv \
     --device cuda \
     --problem regression \

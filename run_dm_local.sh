@@ -1,7 +1,7 @@
 #!/bin/bash
 
 D_LIST=(2)
-SEEDS=(0 1 2 3)
+SEEDS=(0 1 2)
 
 # Output directory
 OUT_DIR="results/linear_syn_dm"
@@ -23,15 +23,15 @@ for D in "${D_LIST[@]}"; do
         START_EXP=$SECONDS
 
         python main.py \
-            --n_clients 150 \
-            --n_clusters 3 \
+            --n_clients 100 \
+            --n_clusters 2 \
             --n_features $D \
             --model linreg \
             --dataset synthetic \
             --algo persfl \
-            --R 1500 \
-            --lrate 0.01 \
-            --S 30 \
+            --R 500 \
+            --lrate 0.03 \
+            --S 20 \
             --fname $F_PATH \
             --device cpu \
             --problem regression \

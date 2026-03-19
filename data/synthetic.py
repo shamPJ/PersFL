@@ -63,8 +63,8 @@ def generate_data(n_clusters, n_clients, n_samples, n_samples_val, n_features, n
 
             # Normalize per client
             scaler = StandardScaler()
-            X_t = scaler.fit_transform(X_t)
-            X_v = scaler.transform(X_v)
+            # X_t = scaler.fit_transform(X_t)
+            # X_v = scaler.transform(X_v)
 
             X_train[node_id] = X_t
             y_train[node_id] = y_t
