@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=hetfl_gmm
+#SBATCH --job-name=persfl_dm
 #SBATCH --time=04:00:00
 #SBATCH --mem=16G
-#SBATCH --cpus-per-task=2 # task is job instance created from the array; each task runs .sh independently
+#SBATCH --cpus-per-task=3 # task is job instance created from the array; each task runs .sh independently
 #SBATCH --gres=gpu:1
 #SBATCH --array=0-39
 #SBATCH --output=logs/out_%A_%a.out
@@ -52,15 +52,15 @@ echo "========================================"
 # Run experiment
 # ===============================
 srun python main.py \
-    --n_clients 150 \
-    --n_clusters 3 \
+    --n_clients 100 \
+    --n_clusters 2 \
     --n_features $D \
     --model linreg \
     --dataset synthetic \
     --algo persfl \
     --R 1500 \
-    --lrate 0.01 \
-    --S 30 \
+    --lrate 0.03 \
+    --S 20 \
     --fname ${OUT_DIR}/linear_syn_dm_${D}_${SEED}.csv \
     --device cuda \
     --problem regression \
