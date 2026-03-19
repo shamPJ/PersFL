@@ -3,3 +3,4 @@
 __pycache__/
 csvs/
 data_cifar10/
+logs/
