@@ -3,7 +3,7 @@ import torch
 from torch.utils.data import Subset
 from torchvision import datasets, transforms
 
-def load_cifar10(root="./data"):
+def load_cifar10(root="./data_cifar10"):
     transform = transforms.Compose([transforms.ToTensor()])
     train_dataset = datasets.CIFAR10(root=root, train=True, download=True, transform=transform)
     test_dataset = datasets.CIFAR10(root=root, train=False, download=True, transform=transform)
@@ -17,13 +17,13 @@ def load_cifar10(root="./data"):
     y = torch.cat([y_train, y_test], dim=0)
     return X, y
 
-def generate_clustered_cifar10(
-    n_clusters, n_clients, n_samples, n_samples_val, seed=0
+def generate_clustered_cifar10_overlap(
+    n_clusters, n_clients, n_samples, n_samples_val, classes_per_cluster=3, seed=0
 ):
     """
-    CIFAR-10 clustered dataset generator.
+    CIFAR-10 clustered dataset generator with overlapping classes.
     
-    Each client belongs to a cluster. Each cluster has a disjoint set of classes. 
+    Each client belongs to a cluster. Each cluster is assigned a subset of classes (possibly overlapping).
     Each client gets n_samples train and n_samples_val validation examples from its cluster's classes.
     
     Returns:
@@ -37,13 +37,12 @@ def generate_clustered_cifar10(
     X, y = load_cifar10()
     y = np.array(y)
     n_classes = 10
-    classes_per_cluster = n_classes // n_clusters
-    class_ids = np.arange(n_classes)
-    rng.shuffle(class_ids)
 
-    # Assign classes to clusters
-    cluster_classes = [class_ids[i*classes_per_cluster:(i+1)*classes_per_cluster] 
-                       for i in range(n_clusters)]
+    # Assign classes to clusters (allow overlap)
+    cluster_classes = []
+    for _ in range(n_clusters):
+        classes = rng.choice(n_classes, size=classes_per_cluster, replace=False)
+        cluster_classes.append(classes.tolist())
 
     # Assign clients to clusters
     clients_per_cluster = n_clients // n_clusters
@@ -55,7 +54,7 @@ def generate_clustered_cifar10(
     rng.shuffle(cluster_labels)
 
     # Prepare per-class indices
-    indices_by_class = {c: np.where(y == c)[0] for c in range(n_classes)}
+    indices_by_class = {c: np.where(y == c)[0].tolist() for c in range(n_classes)}
     for idxs in indices_by_class.values():
         rng.shuffle(idxs)
 
@@ -69,14 +68,20 @@ def generate_clustered_cifar10(
         classes = cluster_classes[cluster_id]
         client_indices = []
 
-        # collect examples from cluster's classes
+        # Collect samples from cluster's classes
         for c in classes:
             idxs_c = indices_by_class[c]
-            take = min(len(idxs_c), n_samples + n_samples_val)
-            client_indices += idxs_c[:take].tolist()
+            take = min(len(idxs_c), n_samples + n_samples_val - len(client_indices))
+            client_indices += idxs_c[:take]
             indices_by_class[c] = idxs_c[take:]
 
         rng.shuffle(client_indices)
+        # If not enough samples, sample with replacement from cluster's classes
+        while len(client_indices) < n_samples + n_samples_val:
+            c = rng.choice(classes)
+            idxs_c = np.where(y == c)[0].tolist()
+            client_indices.append(rng.choice(idxs_c))
+
         train_idxs = client_indices[:n_samples]
         val_idxs = client_indices[n_samples:n_samples + n_samples_val]
 
@@ -95,11 +100,12 @@ def generate_clustered_cifar10(
 # ----------------------
 # Example usage
 # ----------------------
-dataset = generate_clustered_cifar10(
+dataset = generate_clustered_cifar10_overlap(
     n_clusters=5,
     n_clients=50,
     n_samples=50,
     n_samples_val=20,
+    classes_per_cluster=3,
     seed=42
 )
 
