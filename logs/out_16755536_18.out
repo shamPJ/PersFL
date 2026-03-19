@@ -1,0 +1,12 @@
+========================================
+Running experiment on GPU
+  D       = 10
+  seed    = 8
+  GPU     = 0
+========================================
+model.linreg LinReg
+Data params: {'n_clusters': 3, 'n_clients': 150, 'n_samples': 10, 'n_samples_val': 500, 'n_features': 10, 'noise_scale': 0}
+Model params: {'n_features': 10, 'bias': False}
+Algo params: {'lrate': 0.01, 'S': 30, 'R': 1500}
+Detected problem type: regression
+Saved results to results/linear_syn_dm/linear_syn_dm_10_8.csv
