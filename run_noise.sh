@@ -18,7 +18,7 @@ source activate pytorch-env
 # Sweep grids
 # ===============================
 # Sweep parameters
-NOISE_LIST=(0.001 0.01 0.1 1) # label noise dimensionality grid
+NOISE_LIST=(0.1 0.5 1 1.5) # label noise dimensionality grid
 SEEDS=(0 1 2 3 4 5 6 7 8 9)   # repetitions
 
 # Output directory
