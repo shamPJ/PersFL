@@ -32,6 +32,7 @@ def read_options():
 
     # generic options
     parser.add_argument("--noise_scale", type=float, default=0)
+    parser.add_argument("--noise_weight", type=float, default=0)
     parser.add_argument("--R", type=int, default=1500)
     parser.add_argument("--n_features", type=int, default=10)
     parser.add_argument("--lrate", type=float, default=0.1)
