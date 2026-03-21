@@ -36,7 +36,8 @@ DATASETS = {
         "n_samples": 10,
         "n_samples_val": 500,
         "n_features": 2,
-        "noise_scale": 0
+        "noise_scale": 0,
+        "noise_weight": 0 
     })
 }
 

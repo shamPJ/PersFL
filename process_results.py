@@ -26,6 +26,9 @@ def aggregate_for_pgfplots(
         seed = int(match.group(2))
 
         df = pd.read_csv(f)
+        # If the param column is missing, insert it
+        if param_name not in df.columns:
+            df[param_name] = param
 
         # extract chosen metric
         y = df[metric_name].values
@@ -59,10 +62,26 @@ def aggregate_for_pgfplots(
     print(f"Saved → {output_file}")
 
 if __name__ == "__main__":
+    # aggregate_for_pgfplots(
+    #     input_dir="results/linear_syn_noise",
+    #     pattern=r"linear_syn_noise_(\d+(?:\.\d+)?)_(\d+)\.csv",
+    #     param_name="data_noise_scale",
+    #     output_file="aggregated_noise.csv",
+    #     metric_name="MSE_params",   
+    # )
+
+    # aggregate_for_pgfplots(
+    #     input_dir="results/linear_syn_S",
+    #     pattern=r"linear_syn_S_(\d+)_(\d+)\.csv",
+    #     param_name="algo_S",
+    #     output_file="aggregated_S.csv",
+    #     metric_name="MSE_params",   
+    # )
+
     aggregate_for_pgfplots(
-        input_dir="results/linear_syn_dm",
-        pattern=r"linear_syn_dm_(\d+)_(\d+)\.csv",
-        param_name="dm",
-        output_file="aggregated_dm.csv",
+        input_dir="results/linear_syn_weight_noise",
+        pattern=r"linear_syn_weight_noise_(\d+(?:\.\d+)?)_(\d+)\.csv",
+        param_name="data_weight_noise_scale",
+        output_file="aggregated_weight_noise.csv",
         metric_name="MSE_params",   
     )
