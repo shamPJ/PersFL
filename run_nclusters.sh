@@ -18,11 +18,11 @@ source activate pytorch-env
 # Sweep grids
 # ===============================
 # Sweep parameters
-NOISE_LIST=(0.1 0.5 1 1.5) # weight noise dimensionality grid
-SEEDS=(0 1 2 3 4 5 6 7 8 9)   # repetitions
+D_LIST=(2 3 5 10)         # n.o. clusters  grid
+SEEDS=(0 1 2 3 4 5 6 7 8 9)  # repetitions
 
 # Output directory
-OUT_DIR="results/linear_syn_weight_noise"
+OUT_DIR="results/linear_syn_nclusters"
 mkdir -p $OUT_DIR logs
 
 # ===============================
@@ -30,20 +30,20 @@ mkdir -p $OUT_DIR logs
 # ===============================
 IDX=$SLURM_ARRAY_TASK_ID
 
-NN=${#NOISE_LIST[@]} # number of elements in the array
+ND=${#D_LIST[@]} # number of elements in the array
 NS=${#SEEDS[@]}
 
 # Total jobs = 4 * 10 = 40
 
-N_IDX=$(( IDX / NS ))
+D_IDX=$(( IDX / NS ))
 SEED_IDX=$(( IDX %  NS ))
 
-NOISE=${NOISE_LIST[$N_IDX]}
+D=${D_LIST[$D_IDX]}
 SEED=${SEEDS[$SEED_IDX]}
 
 echo "========================================"
 echo "Running experiment on GPU"
-echo "  weight noise   = $NOISE"
+echo "  nclusters       = $D"
 echo "  seed    = $SEED"
 echo "  GPU     = $CUDA_VISIBLE_DEVICES"
 echo "========================================"
@@ -53,17 +53,15 @@ echo "========================================"
 # ===============================
 srun python main.py \
     --n_clients 150 \
-    --n_clusters 3 \
+    --n_clusters $D \
     --n_features 10 \
     --model linreg \
     --dataset synthetic \
-    --noise_weight $NOISE \
-    --noise_scale 0 \
     --algo persfl \
     --R 1500 \
     --lrate 0.01 \
     --S 30 \
-    --fname ${OUT_DIR}/linear_syn_weight_noise_${NOISE}_${SEED}.csv \
+    --fname ${OUT_DIR}/linear_syn_nclusters_${D}_${SEED}.csv \
     --device cuda \
     --problem regression \
     --seed $SEED 
