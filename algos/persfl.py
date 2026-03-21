@@ -5,7 +5,7 @@ from torch import nn
 from utils.metrics import MSE, MSE_params, accuracy, F1
 
 class PersFL:
-    def __init__(self, model_fn, loss_fn, metrics={"MSE_val": MSE}, R=50, S=20, lrate=0.01, device='cpu', seed=None):
+    def __init__(self, model_fn, loss_fn, metrics={"MSE_val": MSE}, R=50, R_local=0, S=20, lrate=0.01, device='cpu', seed=None):
         """
         PersFL Algorithm
 
@@ -22,6 +22,7 @@ class PersFL:
         self.loss_fn = loss_fn
         self.metrics = metrics
         self.R = R
+        self.R_local = R_local
         self.S = S
         self.lrate = lrate
         self.device = device
@@ -48,7 +49,18 @@ class PersFL:
         if was_training:
             model.train()
         return out
-        
+    
+    def local_train(self, model, X, y):
+        model.train()
+        for _ in range(self.R_local):
+            pred = model(X)
+            loss = self.loss_fn(pred, y)
+            grads = torch.autograd.grad(loss, model.parameters())
+
+            with torch.no_grad():
+                for p, g in zip(model.parameters(), grads):
+                    p -= self.lrate * g
+    
     # --------------------------------
     # Run method: 
     # --------------------------------
@@ -94,6 +106,14 @@ class PersFL:
 
         # Main iteration loop
         for r in range(self.R):
+            # --- local updates ---
+            for i in range(n_clients):
+                self.local_train(
+                    self.client_models[i],
+                    X_train[i],
+                    y_train[i],
+                    self.R_local
+                )
             # Step 1: sample candidate neighbors (exclude self)
             candidate_indices = []
             for i in range(n_clients):

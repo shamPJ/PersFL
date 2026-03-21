@@ -45,7 +45,8 @@ ALGOS = {
     "persfl": AlgoSpec(module="algos.persfl", cls="PersFL", default_params={
         "lrate": 0.03,
         "S": 30,
-        "R": 1500}),
+        "R": 1500,
+        "R_local": 0}),
     
     "fedavg": AlgoSpec(module="algos.fedavg", cls="FedAvg", default_params={
         "lrate": 0.03,

@@ -54,31 +54,46 @@ def aggregate_for_pgfplots(
         out[f"{param_name}_{p}_mean"] = mean
         out[f"{param_name}_{p}_upper"] = mean + sem
         out[f"{param_name}_{p}_lower"] = mean - sem
-
     out.to_csv(output_file, index=False)
     print(f"Saved → {output_file}")
 
 if __name__ == "__main__":
-    # aggregate_for_pgfplots(
-    #     input_dir="results/linear_syn_noise",
-    #     pattern=r"linear_syn_noise_(\d+(?:\.\d+)?)_(\d+)\.csv",
-    #     param_name="data_noise_scale",
-    #     output_file="aggregated_noise.csv",
-    #     metric_name="MSE_params",   
-    # )
+    aggregate_for_pgfplots(
+        input_dir="results/linear_syn_dm",
+        pattern=r"linear_syn_dm_(\d+(?:\.\d+)?)_(\d+)\.csv",
+        param_name="data_n_features",
+        output_file="aggregated_dm.csv",
+        metric_name="MSE_params",   
+    )
 
-    # aggregate_for_pgfplots(
-    #     input_dir="results/linear_syn_S",
-    #     pattern=r"linear_syn_S_(\d+)_(\d+)\.csv",
-    #     param_name="algo_S",
-    #     output_file="aggregated_S.csv",
-    #     metric_name="MSE_params",   
-    # )
+    aggregate_for_pgfplots(
+        input_dir="results/linear_syn_noise",
+        pattern=r"linear_syn_noise_(\d+(?:\.\d+)?)_(\d+)\.csv",
+        param_name="data_noise_scale",
+        output_file="aggregated_noise.csv",
+        metric_name="MSE_params",   
+    )
+
+    aggregate_for_pgfplots(
+        input_dir="results/linear_syn_S",
+        pattern=r"linear_syn_S_(\d+)_(\d+)\.csv",
+        param_name="algo_S",
+        output_file="aggregated_S.csv",
+        metric_name="MSE_params",   
+    )
 
     aggregate_for_pgfplots(
         input_dir="results/linear_syn_weight_noise",
         pattern=r"linear_syn_weight_noise_(\d+(?:\.\d+)?)_(\d+)\.csv",
-        param_name="data_weight_noise",
-        output_file="aggregated_weight_noise.csv",
+        param_name="data_noise_weight",
+        output_file="aggregated_noise_weight.csv",
+        metric_name="MSE_params",   
+    )
+
+    aggregate_for_pgfplots(
+        input_dir="results/linear_syn_nclusters",
+        pattern=r"linear_syn_nclusters_(\d+(?:\.\d+)?)_(\d+)\.csv",
+        param_name="data_n_clusters",
+        output_file="aggregated_nclusters.csv",
         metric_name="MSE_params",   
     )
