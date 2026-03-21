@@ -4,13 +4,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
-csvs = glob.glob(os.path.join("results/linear_syn_S", "linear_syn_S_*.csv"))
+csvs = glob.glob(os.path.join("results/linear_syn_weight_noise", "linear_syn_weight_noise_*.csv"))
 
 dfs = []
 for f in csvs:
     fname = os.path.basename(f)
-    core = fname.replace("linear_syn_S_", "").replace(".csv", "")
-    S, SEED = core.split("_")
+    core = fname.replace("linear_syn_weight_noise_", "").replace(".csv", "")
+    W_NOISE, SEED = core.split("_")
 
     tmp = pd.read_csv(f)
     tmp["seed"] = int(SEED)
@@ -23,12 +23,12 @@ df = pd.concat(dfs, ignore_index=True)
 # -----------------------------
 metric_cols = ["loss_mean", "MSE_val", "MSE_params"]
 
-S_vals = sorted(df['algo_S'].unique())
+noise_vals = sorted(df['data_noise_weight'].unique())
 R = df['iter'].max() + 1
 reps = df['seed'].nunique()
 
 x = np.arange(R)
-labels = [f"S={S}" for S in S_vals]
+labels = [f"noise weights={n}" for n in noise_vals]
 
 # -----------------------------
 # Loop over metrics
@@ -37,13 +37,13 @@ for metric in metric_cols:
     mean_metric = []
     sem_metric = []
 
-    for S in S_vals:
-        df_S = df[df['algo_S'] == S]
+    for n in noise_vals:
+        df_n = df[df['data_noise_weight'] == n]
 
         runs = np.zeros((reps, R))
 
         for r in range(R):
-            vals = df_S[df_S['iter'] == r][metric].values
+            vals = df_n[df_n['iter'] == r][metric].values
             runs[:, r] = vals
 
         mean_metric.append(np.mean(runs, axis=0))
@@ -54,7 +54,7 @@ for metric in metric_cols:
     # -----------------------------
     plt.figure(figsize=(6, 4))
 
-    for i in range(len(S_vals)):
+    for i in range(len(noise_vals)):
         plt.plot(x, mean_metric[i], label=labels[i])
         plt.fill_between(
             x,
@@ -73,6 +73,6 @@ for metric in metric_cols:
     plt.grid(True)
     plt.tight_layout()
 
-    plt.savefig(f"{metric}_vs_S.png", dpi=300)
+    plt.savefig(f"{metric}_vs_noise_weights.png", dpi=300)
     plt.show()
     plt.close()
