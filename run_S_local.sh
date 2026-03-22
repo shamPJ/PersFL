@@ -32,7 +32,7 @@ for S in "${BATCH_SIZES[@]}"; do
             --model linreg \
             --dataset synthetic \
             --algo persfl \
-            --R 1500 \
+            --R 500 \
             --lrate 0.01 \
             --S $S \
             --fname $F_PATH \

@@ -4,13 +4,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
-csvs = glob.glob(os.path.join("results/linear_syn_weight_noise", "linear_syn_weight_noise_*.csv"))
+dir = "linear_syn_dm_algo2"
+csvs = glob.glob(os.path.join("results", dir, "linear_syn_dm_*.csv"))
 
 dfs = []
 for f in csvs:
     fname = os.path.basename(f)
-    core = fname.replace("linear_syn_weight_noise_", "").replace(".csv", "")
-    W_NOISE, SEED = core.split("_")
+    core = fname.replace("linear_syn_dm_", "").replace(".csv", "")
+    PARAM, SEED = core.split("_")
 
     tmp = pd.read_csv(f)
     tmp["seed"] = int(SEED)
@@ -23,12 +24,12 @@ df = pd.concat(dfs, ignore_index=True)
 # -----------------------------
 metric_cols = ["loss_mean", "MSE_val", "MSE_params"]
 
-noise_vals = sorted(df['data_noise_weight'].unique())
+param_vals = sorted(df['data_n_features'].unique())
 R = df['iter'].max() + 1
 reps = df['seed'].nunique()
 
 x = np.arange(R)
-labels = [f"noise weights={n}" for n in noise_vals]
+labels = [f"dm={param}" for param in param_vals]
 
 # -----------------------------
 # Loop over metrics
@@ -37,13 +38,13 @@ for metric in metric_cols:
     mean_metric = []
     sem_metric = []
 
-    for n in noise_vals:
-        df_n = df[df['data_noise_weight'] == n]
+    for param in param_vals:
+        df_p = df[df['data_n_features'] == param]
 
         runs = np.zeros((reps, R))
 
         for r in range(R):
-            vals = df_n[df_n['iter'] == r][metric].values
+            vals = df_p[df_p['iter'] == r][metric].values
             runs[:, r] = vals
 
         mean_metric.append(np.mean(runs, axis=0))
@@ -54,7 +55,7 @@ for metric in metric_cols:
     # -----------------------------
     plt.figure(figsize=(6, 4))
 
-    for i in range(len(noise_vals)):
+    for i in range(len(param_vals)):
         plt.plot(x, mean_metric[i], label=labels[i])
         plt.fill_between(
             x,
@@ -73,6 +74,6 @@ for metric in metric_cols:
     plt.grid(True)
     plt.tight_layout()
 
-    plt.savefig(f"{metric}_vs_noise_weights.png", dpi=300)
+    plt.savefig(f"{metric}_vs_dm_algo2.png", dpi=300)
     plt.show()
     plt.close()

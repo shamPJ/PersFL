@@ -23,7 +23,13 @@ SEEDS=(0 1 2 3 4 5 6 7 8 9)  # repetitions
 
 # Output directory
 OUT_DIR="results/linear_syn_dm"
-mkdir -p $OUT_DIR logs
+mkdir -p $OUT_DIR
+
+# Algorithm subdirectories
+ALGOS=("Algorithm1" "Algorithm2")
+for ALG in "${ALGOS[@]}"; do
+    mkdir -p "${OUT_DIR}/${ALG}"
+done
 
 # ===============================
 # Index mapping
@@ -51,17 +57,33 @@ echo "========================================"
 # ===============================
 # Run experiment
 # ===============================
+# srun python main.py \
+#     --n_clients 150 \
+#     --n_clusters 3 \
+#     --n_features $D \
+#     --model linreg \
+#     --dataset synthetic \
+#     --algo persfl \
+#     --R 1500 \
+#     --lrate 0.01 \
+#     --S 30 \
+#     --fname ${OUT_DIR}/linear_syn_dm_${D}_${SEED}.csv \
+#     --device cuda \
+#     --problem regression \
+#     --seed $SEED 
+
 srun python main.py \
     --n_clients 150 \
     --n_clusters 3 \
     --n_features $D \
     --model linreg \
     --dataset synthetic \
-    --algo persfl \
+    --algo Algorithm2 \
     --R 1500 \
+    --R_local 0 \
     --lrate 0.01 \
     --S 30 \
-    --fname ${OUT_DIR}/linear_syn_dm_${D}_${SEED}.csv \
+    --fname ${OUT_DIR}/Algorithm2/linear_syn_dm_${D}_${SEED}.csv \
     --device cuda \
     --problem regression \
     --seed $SEED 

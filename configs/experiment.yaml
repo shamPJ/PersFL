@@ -1,0 +1,34 @@
+# configs/experiments.yaml
+OUT_DIR: results/experiments
+DEVICE: cuda
+
+n_clients: 150
+model: linreg
+dataset: synthetic
+algo: persfl
+R: 1500
+lrate: 0.01
+S: 30
+problem: regression
+
+# Core experiment grid (without seeds)
+experiments:
+  - D: 2.         # Dimensionality
+    N_CLUSTERS: 3
+  - D: 10
+    N_CLUSTERS: 3
+  - D: 50
+    N_CLUSTERS: 3
+  - D: 100
+    N_CLUSTERS: 3
+  - D: 10.       # number of clusters
+    N_CLUSTERS: 2
+  - D: 10
+    N_CLUSTERS: 3
+  - D: 10
+    N_CLUSTERS: 5
+  - D: 10
+    N_CLUSTERS: 10
+
+# Seeds to repeat each experiment
+SEEDS: [0,1,2,3,4,5,6,7,8,9]

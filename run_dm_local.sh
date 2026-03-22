@@ -4,7 +4,7 @@ D_LIST=(2)
 SEEDS=(0 1 2)
 
 # Output directory
-OUT_DIR="results/linear_syn_dm"
+OUT_DIR="results/linear_syn_dm_algo2"
 mkdir -p $OUT_DIR
 
 # timing 
@@ -28,9 +28,10 @@ for D in "${D_LIST[@]}"; do
             --n_features $D \
             --model linreg \
             --dataset synthetic \
-            --algo persfl \
+            --algo Algorithm2 \
             --R 500 \
-            --lrate 0.03 \
+            --R_local 0 \
+            --lrate 0.01 \
             --S 20 \
             --fname $F_PATH \
             --device cpu \
