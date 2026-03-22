@@ -111,8 +111,7 @@ class PersFL:
                 self.local_train(
                     self.client_models[i],
                     X_train[i],
-                    y_train[i],
-                    self.R_local
+                    y_train[i]
                 )
             # Step 1: sample candidate neighbors (exclude self)
             candidate_indices = []
