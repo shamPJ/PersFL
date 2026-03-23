@@ -42,7 +42,7 @@ DATASETS = {
 }
 
 ALGOS = {
-    "persfl": AlgoSpec(module="algos.persfl", cls="PersFL", default_params={
+    "persfl": AlgoSpec(module="algos.Algorithm1", cls="Algorithm1", default_params={
         "lrate": 0.01,
         "S": 30,
         "R": 1500,
@@ -53,7 +53,7 @@ ALGOS = {
         "lmbd": 1,
         "S": 30,
         "R": 1500,
-        "R_local": 1}),
+        "R_local": 0}),
     
     "fedavg": AlgoSpec(module="algos.fedavg", cls="FedAvg", default_params={
         "lrate": 0.03,

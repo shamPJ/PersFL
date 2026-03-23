@@ -4,7 +4,7 @@ import random
 from torch import nn
 from utils.metrics import MSE, MSE_params, accuracy, F1
 
-class PersFL:
+class Algorithm1:
     def __init__(self, model_fn, loss_fn, metrics={"MSE_val": MSE}, R=50, R_local=0, S=20, lrate=0.01, device='cpu', seed=None):
         """
         PersFL Algorithm

@@ -26,7 +26,7 @@ def read_options():
         "--algo",
         type=str,
         choices=list(ALGOS.keys()),
-        default="persfl",
+        default="Algorithm1",
         help="federated algorithm to use"
     )
 

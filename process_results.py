@@ -66,6 +66,14 @@ if __name__ == "__main__":
     #     metric_name="MSE_params",   
     # )
 
+    aggregate_for_pgfplots(
+        input_dir="results/linear_syn_dm/Algorithm2",
+        pattern=r"linear_syn_dm_(\d+(?:\.\d+)?)_(\d+)\.csv",
+        param_name="data_n_features",
+        output_file="aggregated_dm_Algorithm2.csv",
+        metric_name="MSE_params",   
+    )
+
     # aggregate_for_pgfplots(
     #     input_dir="results/linear_syn_noise",
     #     pattern=r"linear_syn_noise_(\d+(?:\.\d+)?)_(\d+)\.csv",
@@ -98,10 +106,10 @@ if __name__ == "__main__":
     #     metric_name="MSE_params",   
     # )
 
-    aggregate_for_pgfplots(
-        input_dir="results/linear_syn_R",
-        pattern=r"linear_syn_R_(\d+(?:\.\d+)?)_(\d+)\.csv",
-        param_name="algo_R_local",
-        output_file="aggregated_R.csv",
-        metric_name="MSE_params",   
-    )
+    # aggregate_for_pgfplots(
+    #     input_dir="results/linear_syn_R",
+    #     pattern=r"linear_syn_R_(\d+(?:\.\d+)?)_(\d+)\.csv",
+    #     param_name="algo_R_local",
+    #     output_file="aggregated_R.csv",
+    #     metric_name="MSE_params",   
+    # )
