@@ -24,7 +24,7 @@ PARAM_LIST=(2 3 5 10)         # n.o. clusters  grid
 SEEDS=(0 1 2 3 4 5 6 7 8 9)  # repetitions
 
 # Output directory
-OUT_DIR="results/linear_syn_nclusters"
+OUT_DIR="$SLURM_SUBMIT_DIR/results/linear_syn_nclusters"
 mkdir -p $OUT_DIR
 
 # Algorithm subdirectories
