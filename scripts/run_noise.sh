@@ -14,6 +14,8 @@
 module load mamba
 source activate pytorch-env
 
+export PYTHONPATH=$PYTHONPATH:$PWD
+
 # ===============================
 # Sweep grids
 # ===============================
@@ -57,7 +59,7 @@ echo "========================================"
 # ===============================
 # Run experiment
 # ===============================
-# srun python main.py \
+# srun python scripts/main.py \
 #     --n_clients 150 \
 #     --n_clusters 3 \
 #     --n_features 10 \
@@ -74,7 +76,7 @@ echo "========================================"
 #     --problem regression \
 #     --seed $SEED 
 
-srun python main.py \
+srun python scripts/main.py \
     --n_clients 150 \
     --n_clusters 3 \
     --n_features 10 \

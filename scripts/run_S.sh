@@ -14,6 +14,8 @@
 module load mamba
 source activate pytorch-env
 
+export PYTHONPATH=$PYTHONPATH:$PWD
+
 # ===============================
 # Sweep grids
 # ===============================
@@ -22,7 +24,7 @@ PARAM_LIST=(10 20 30 50)         # candidate set size grid
 SEEDS=(0 1 2 3 4 5 6 7 8 9)  # repetitions
 
 # Output directory
-OUT_DIR="../results/linear_syn_S"
+OUT_DIR="$SLURM_SUBMIT_DIR/results/linear_syn_S"
 mkdir -p $OUT_DIR
 
 # Algorithm subdirectories
@@ -73,7 +75,7 @@ echo "========================================"
 #     --problem regression \
 #     --seed $SEED 
 
-srun python main.py \
+srun python scripts/main.py \
     --n_clients 150 \
     --n_clusters 3 \
     --n_features 10 \
