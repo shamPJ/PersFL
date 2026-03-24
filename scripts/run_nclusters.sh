@@ -74,7 +74,7 @@ echo "========================================"
 #     --problem regression \
 #     --seed $SEED 
 
-srun python script/main.py \
+srun python scripts/main.py \
     --n_clients 150 \
     --n_clusters $PARAM \
     --n_features 10 \
