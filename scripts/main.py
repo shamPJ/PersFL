@@ -84,7 +84,7 @@ if __name__ == "__main__":
 
     elif problem_type == "classification":
         loss_fn = nn.CrossEntropyLoss()
-        metrics = {"accuracy": accuracy, "F1": F1}
+        metrics = {"accuracy": accuracy}
 
     # -----------------------------
     # Model factory
@@ -146,4 +146,3 @@ if __name__ == "__main__":
     df.to_csv(fname, index=False)
 
     print(f"Saved results to {fname}")
-

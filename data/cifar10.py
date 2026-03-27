@@ -4,7 +4,12 @@ from torch.utils.data import Subset
 from torchvision import datasets, transforms
 
 def load_cifar10(root="./data_cifar10"):
-    transform = transforms.Compose([transforms.ToTensor()])
+
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616)) 
+    ])
+
     train_dataset = datasets.CIFAR10(root=root, train=True, download=True, transform=transform)
     test_dataset = datasets.CIFAR10(root=root, train=False, download=True, transform=transform)
 
@@ -17,8 +22,8 @@ def load_cifar10(root="./data_cifar10"):
     y = torch.cat([y_train, y_test], dim=0)
     return X, y
 
-def generate_clustered_cifar10_overlap(
-    n_clusters, n_clients, n_samples, n_samples_val, classes_per_cluster=3, seed=0
+def generate_clustered_cifar10(
+    n_clusters, n_clients, n_samples, n_samples_val, n_classes=3, seed=0
 ):
     """
     CIFAR-10 clustered dataset generator with overlapping classes.
@@ -36,25 +41,29 @@ def generate_clustered_cifar10_overlap(
     rng = np.random.default_rng(seed)
     X, y = load_cifar10()
     y = np.array(y)
-    n_classes = 10
+    n_classes_total = 10
 
     # Assign classes to clusters (allow overlap)
-    cluster_classes = []
+    cluster_classes = [] 
+    # e.g. [[4, 0, 5, 6], [4, 1, 0, 5], [5, 4, 6, 1]]
+    # for n_clusters=3, n_classes=4, n_clients=10
     for _ in range(n_clusters):
-        classes = rng.choice(n_classes, size=classes_per_cluster, replace=False)
+        classes = rng.choice(n_classes_total, size=n_classes, replace=False)
         cluster_classes.append(classes.tolist())
 
     # Assign clients to clusters
     clients_per_cluster = n_clients // n_clusters
-    cluster_labels = []
+    cluster_labels = [] # e.g. [2 0 1 0 1 1 2 0 1 2] for n_clusters=3, n_clients=10
     for cluster_id in range(n_clusters):
-        cluster_labels += [cluster_id] * clients_per_cluster
-    cluster_labels += rng.choice(n_clusters, n_clients - len(cluster_labels)).tolist()
+        cluster_labels += [cluster_id] * clients_per_cluster # e.g. [0, 0, 0, 1, 1, 1, 2, 2, 2]
+    # add remaining clients to random clusters if n_clients not divisible by n_clusters
+    # e.g. [0, 0, 0, 1, 1, 1, 2, 2, 2, 1] to ensure approx. equal distribution of clients across clusters
+    cluster_labels += rng.choice(n_clusters, n_clients - len(cluster_labels)).tolist() 
     cluster_labels = np.array(cluster_labels)
     rng.shuffle(cluster_labels)
 
     # Prepare per-class indices
-    indices_by_class = {c: np.where(y == c)[0].tolist() for c in range(n_classes)}
+    indices_by_class = {c: np.where(y == c)[0].tolist() for c in range(n_classes_total)}
     for idxs in indices_by_class.values():
         rng.shuffle(idxs)
 
@@ -64,16 +73,18 @@ def generate_clustered_cifar10_overlap(
     X_val = torch.zeros((n_clients, n_samples_val, *X.shape[1:]), dtype=torch.float32)
     y_val = torch.zeros((n_clients, n_samples_val), dtype=torch.long)
 
+    samples_per_class = (n_samples + n_samples_val) // n_classes # to sample approximately equal number of examples per class for each client
     for i, cluster_id in enumerate(cluster_labels):
+        # for ech client, get its cluster's classes and sample from them
         classes = cluster_classes[cluster_id]
         client_indices = []
 
         # Collect samples from cluster's classes
         for c in classes:
             idxs_c = indices_by_class[c]
-            take = min(len(idxs_c), n_samples + n_samples_val - len(client_indices))
+            take = min(len(idxs_c[:samples_per_class]), n_samples + n_samples_val - len(client_indices))
             client_indices += idxs_c[:take]
-            indices_by_class[c] = idxs_c[take:]
+            indices_by_class[c] = idxs_c[take:] # remove taken indices
 
         rng.shuffle(client_indices)
         # If not enough samples, sample with replacement from cluster's classes
@@ -100,12 +111,12 @@ def generate_clustered_cifar10_overlap(
 # ----------------------
 # Example usage
 # ----------------------
-dataset = generate_clustered_cifar10_overlap(
+dataset = generate_clustered_cifar10(
     n_clusters=5,
     n_clients=50,
     n_samples=50,
     n_samples_val=20,
-    classes_per_cluster=3,
+    n_classes=3,
     seed=42
 )
 

@@ -74,13 +74,13 @@ if __name__ == "__main__":
     #     metric_name="MSE_params",   
     # )
 
-    # aggregate_for_pgfplots(
-    #     input_dir="results/linear_syn_noise",
-    #     pattern=r"linear_syn_noise_(\d+(?:\.\d+)?)_(\d+)\.csv",
-    #     param_name="data_noise_scale",
-    #     output_file="aggregated_noise.csv",
-    #     metric_name="MSE_params",   
-    # )
+    aggregate_for_pgfplots(
+        input_dir="results/linear_syn_noise/Algorithm2",
+        pattern=r"linear_syn_noise_(\d+(?:\.\d+)?)_(\d+)\.csv",
+        param_name="data_noise_scale",
+        output_file="aggregated_noise_Algorithm2.csv",
+        metric_name="MSE_params",   
+    )
 
     # aggregate_for_pgfplots(
     #     input_dir="results/linear_syn_S/Algorithm2",
@@ -90,26 +90,26 @@ if __name__ == "__main__":
     #     metric_name="MSE_params",   
     # )
 
-    # aggregate_for_pgfplots(
-    #     input_dir="results/linear_syn_weight_noise",
-    #     pattern=r"linear_syn_weight_noise_(\d+(?:\.\d+)?)_(\d+)\.csv",
-    #     param_name="data_noise_weight",
-    #     output_file="aggregated_noise_weight.csv",
-    #     metric_name="MSE_params",   
-    # )
-
-    # aggregate_for_pgfplots(
-    #     input_dir="results/linear_syn_nclusters",
-    #     pattern=r"linear_syn_nclusters_(\d+(?:\.\d+)?)_(\d+)\.csv",
-    #     param_name="data_n_clusters",
-    #     output_file="aggregated_nclusters.csv",
-    #     metric_name="MSE_params",   
-    # )
-
     aggregate_for_pgfplots(
-        input_dir="results/linear_syn_R/Algorithm2",
-        pattern=r"linear_syn_R_(\d+(?:\.\d+)?)_(\d+)\.csv",
-        param_name="algo_R_local",
-        output_file="aggregated_R_Algorithm2.csv",
+        input_dir="results/linear_syn_noise_w/Algorithm2",
+        pattern=r"linear_syn_noise_w_(\d+(?:\.\d+)?)_(\d+)\.csv",
+        param_name="data_noise_weight",
+        output_file="aggregated_noise_weight_Algorithm2.csv",
         metric_name="MSE_params",   
     )
+
+    aggregate_for_pgfplots(
+        input_dir="results/linear_syn_nclusters/Algorithm2",
+        pattern=r"linear_syn_nclusters_(\d+(?:\.\d+)?)_(\d+)\.csv",
+        param_name="data_n_clusters",
+        output_file="aggregated_nclusters_Algorithm2.csv",
+        metric_name="MSE_params",   
+    )
+
+    # aggregate_for_pgfplots(
+    #     input_dir="results/linear_syn_R/Algorithm2",
+    #     pattern=r"linear_syn_R_(\d+(?:\.\d+)?)_(\d+)\.csv",
+    #     param_name="algo_R_local",
+    #     output_file="aggregated_R_Algorithm2.csv",
+    #     metric_name="MSE_params",   
+    # )

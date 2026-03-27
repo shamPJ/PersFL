@@ -8,9 +8,9 @@ class CNN(nn.Module):
     
     Args:
         input_shape (tuple): (C, H, W)
-        num_classes (int): number of output classes
+        n_classes (int): number of output classes
     """
-    def __init__(self, input_shape=(3,32,32), num_classes=10):
+    def __init__(self, input_shape=(3,32,32), n_classes=10):
         super().__init__()
         C, H, W = input_shape
         
@@ -32,7 +32,7 @@ class CNN(nn.Module):
         
         # Fully connected layers
         self.fc1 = nn.Linear(fc_input_size, 256)
-        self.fc2 = nn.Linear(256, num_classes)
+        self.fc2 = nn.Linear(256, n_classes)
     
     def forward(self, x):
         # Conv layers with ReLU + pooling

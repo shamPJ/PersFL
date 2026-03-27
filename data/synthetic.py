@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
@@ -46,6 +47,12 @@ def generate_data(n_clusters, n_clients, n_samples, n_samples_val, n_features, n
             y_val[i*n_ds + idx] = y_v
 
             cluster_labels.append(i)
+        
+    
+    X_train = torch.as_tensor(X_train, dtype=torch.float32)
+    y_train = torch.tensor(y_train, dtype=torch.float32)
+    X_val = torch.as_tensor(X_val, dtype=torch.float32)
+    y_val = torch.tensor(y_val, dtype=torch.float32)
 
     return {
         "train": (X_train, y_train),
