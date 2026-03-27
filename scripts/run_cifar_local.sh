@@ -23,17 +23,17 @@ for SEED in "${SEEDS[@]}"; do
     START_EXP=$SECONDS
 
     python scripts/main.py \
-        --n_clients 10 \
+        --n_clients 20 \
         --n_clusters 1 \
         --n_classes 10 \
         --model cnn \
         --dataset cifar10 \
         --algo Algorithm1 \
         --R 500 \
-        --R_local 5 \
-        --lrate 0.01 \
+        --R_local 2 \
+        --lrate 0.02 \
         --momentum 0.9 \
-        --lrate_decay 0.995 \
+        --lrate_decay 0.999 \
         --S 10 \
         --fname ${OUT_DIR}/Algorithm1/cnn_cifar10_iid_${SEED}.csv \
         --device cpu \

@@ -17,8 +17,9 @@ class CNN(nn.Module):
         # Convolutional layers
         self.conv1 = nn.Conv2d(C, 32, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.pool = nn.MaxPool2d(2, 2)
         self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.conv4 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
+        self.pool = nn.MaxPool2d(2, 2)
         
         # Use dummy forward to infer FC input size
         with torch.no_grad():
@@ -27,6 +28,8 @@ class CNN(nn.Module):
             x = F.relu(self.conv2(x))
             x = self.pool(x)
             x = F.relu(self.conv3(x))
+            x = self.pool(x)
+            x = F.relu(self.conv4(x))
             x = self.pool(x)
             fc_input_size = x.shape[1] * x.shape[2] * x.shape[3]
         
@@ -40,6 +43,8 @@ class CNN(nn.Module):
         x = F.relu(self.conv2(x))
         x = self.pool(x)
         x = F.relu(self.conv3(x))
+        x = self.pool(x)
+        x = F.relu(self.conv4(x))
         x = self.pool(x)
         
         # Flatten and fully connected
