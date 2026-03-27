@@ -49,6 +49,7 @@ def generate_clustered_cifar10(
     # for n_clusters=3, n_classes=4, n_clients=10
     for _ in range(n_clusters):
         classes = rng.choice(n_classes_total, size=n_classes, replace=False)
+        print("n_clusters,n_classes, classes", n_clusters,n_classes, classes)
         cluster_classes.append(classes.tolist())
 
     # Assign clients to clusters

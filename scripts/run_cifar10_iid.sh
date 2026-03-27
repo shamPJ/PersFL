@@ -4,7 +4,7 @@
 #SBATCH --mem=16G
 #SBATCH --cpus-per-task=3 # task is job instance created from the array; each task runs .sh independently
 #SBATCH --gres=gpu:1
-#SBATCH --array=0-9
+#SBATCH --array=0-1
 #SBATCH --output=logs/out_%A_%a.out
 #SBATCH --error=logs/err_%A_%a.err
 
@@ -12,12 +12,14 @@
 # Environment
 # ===============================
 module load mamba
-source activate pytorch-env
+source activate pytorch-env-cuda118
 
 # ===============================
 # Sweep grids
 # ===============================
 SEEDS=(0 1 2 3 4 5 6 7 8 9)  # repetitions
+
+export PYTHONPATH=$PYTHONPATH:$PWD
 
 # Output directory
 OUT_DIR="results/cnn_cifar10_iid"
@@ -43,16 +45,16 @@ echo "========================================"
 # ===============================
 # Run experiment
 # ===============================
-srun python main.py \
-    --n_clients 10 \
+srun python scripts/main.py \
+    --n_clients 20 \
     --n_clusters 1 \
+    --n_classes 10 \
     --model cnn \
     --dataset cifar10 \
     --algo Algorithm1 \
-    --R 100 \
+    --R 1000 \
     --R_local 2 \
-    --lrate 0.01 \
-    --lrate 0.01 \
+    --lrate 0.02 \
     --momentum 0.9 \
     --lrate_decay 0.995 \
     --S 10 \
