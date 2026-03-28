@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=persfl_dm
 #SBATCH --time=04:00:00
-#SBATCH --mem=16G
+#SBATCH --mem=32G
 #SBATCH --cpus-per-task=3 # task is job instance created from the array; each task runs .sh independently
 #SBATCH --gres=gpu:1
 #SBATCH --array=0-1
@@ -52,11 +52,11 @@ srun python scripts/main.py \
     --model cnn \
     --dataset cifar10 \
     --algo Algorithm1 \
-    --R 1000 \
+    --R 500 \
     --R_local 2 \
-    --lrate 0.02 \
+    --lrate 0.05 \
     --momentum 0.9 \
-    --lrate_decay 0.995 \
+    --lrate_decay 0.999 \
     --S 10 \
     --fname ${OUT_DIR}/Algorithm1/cnn_cifar10_iid_${SEED}.csv \
     --device cuda \

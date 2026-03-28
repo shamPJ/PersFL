@@ -44,7 +44,7 @@ DATASETS = {
         "n_clients": 10,
         "n_clusters": 1,
         "n_classes": 10,
-        "n_samples": 1000,
+        "n_samples": 100,
         "n_samples_val": 1000,
         "seed": 0
     })
