@@ -64,9 +64,18 @@ class Algorithm1:
 
         use_momentum = (velocity is not None and self.momentum > 0)
 
+        data_size = X.shape[0]
+        batch_size = min(32, data_size)
+
         for _ in range(self.R_local):
-            pred = model(X)
-            loss = self.loss_fn(pred, y)
+            # batching
+            idx = torch.randperm(data_size, device=self.device)[:batch_size]
+            X_batch = X[idx]
+            y_batch = y[idx]
+            
+            pred = model(X_batch)
+            loss = self.loss_fn(pred, y_batch)
+    
             grads = torch.autograd.grad(loss, model.parameters(), create_graph=False)
 
             with torch.no_grad():

@@ -6,7 +6,8 @@ export PYTHONPATH=$PYTHONPATH:$PWD
 
 OUT_DIR="results/cnn_cifar10_iid"
 mkdir -p $OUT_DIR
-mkdir -p $OUT_DIR/Algorithm1
+# mkdir -p $OUT_DIR/Algorithm1
+mkdir -p $OUT_DIR/FedAvg
 
 # timing 
 START=$SECONDS
@@ -28,14 +29,14 @@ for SEED in "${SEEDS[@]}"; do
         --n_classes 10 \
         --model cnn \
         --dataset cifar10 \
-        --algo Algorithm1 \
+        --algo FedAvg \
         --R 500 \
-        --R_local 2 \
-        --lrate 0.02 \
+        --R_local 10 \
+        --lrate 0.01 \
         --momentum 0.9 \
         --lrate_decay 0.999 \
         --S 10 \
-        --fname ${OUT_DIR}/Algorithm1/cnn_cifar10_iid_${SEED}.csv \
+        --fname ${OUT_DIR}/FedAvg/cnn_cifar10_iid_${SEED}.csv \
         --device cpu \
         --problem classification \
         --seed $SEED 

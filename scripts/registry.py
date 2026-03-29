@@ -1,4 +1,4 @@
-from algos.flavg import FedAvg
+from algos.FedAvg import FedAvg
 import torch
 from dataclasses import dataclass
 from torch import nn
@@ -67,8 +67,11 @@ ALGOS = {
         "R": 1500,
         "R_local": 0}),
     
-    "fedavg": AlgoSpec(module="algos.fedavg", cls="FedAvg", default_params={
-        "lrate": 0.03,
-        "S": 30,
-        "R": 1500})
+    "FedAvg": AlgoSpec(module="algos.FedAvg", cls="FedAvg", default_params={
+        "lrate": 0.01,
+        "momentum": 0.9,
+        "lrate_decay": 0.999,
+        "S": 10,
+        "R": 500,
+        "R_local": 5})
 }

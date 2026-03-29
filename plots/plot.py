@@ -20,6 +20,8 @@ csvs = glob.glob(os.path.join("results", dir, "cnn_cifar10_iid_1.csv"))
 
 # df = pd.concat(dfs, ignore_index=True)
 df = pd.read_csv(csvs[0], sep=',')
+plt.plot(df['iter'], df['loss_mean'])
+plt.show()
 plt.plot(df['iter'], df['accuracy'])
 plt.show()
 # # -----------------------------

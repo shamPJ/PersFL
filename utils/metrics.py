@@ -8,6 +8,8 @@ def MSE_params(pred, target, model=None, extra=None):
     return torch.mean((pred - target) ** 2)
 
 def accuracy(pred, target, model=None, extra=None):
+    # print(f"  preds shape: {pred.shape}, targets shape: {target.shape}")
+    # print(f"  targets unique: {target.unique()}")
     return (pred.argmax(dim=1) == target).float().mean()
 def F1(pred, target, model=None, extra=None):
     # Placeholder for proper F1 computation

@@ -5,23 +5,21 @@ import copy
 from torch import nn
 
 class FedAvg:
-    def __init__(
-        self,
-        model_fn,
-        loss_fn,
-        metrics,
-        R=50,
-        S=20,
-        lrate=0.01,
-        device='cpu',
-        seed=None
+    def __init__(self, model_fn, loss_fn, metrics, R=50, R_local=0, S=20,
+        lrate=0.01, momentum=0.0, lrate_decay=None,
+        device='cpu', seed=None
     ):
         self.model_fn = model_fn
         self.loss_fn = loss_fn
         self.metrics = metrics
         self.R = R
+        self.R_local = R_local
         self.S = S
+        self.lrate_init = lrate
         self.lrate = lrate
+        self.momentum = momentum
+        self.lrate_decay = lrate_decay
+        self.velocities = None
         self.device = device
         self.seed = seed
 
@@ -52,6 +50,37 @@ class FedAvg:
         if was_training:
             model.train()
         return out
+    
+    def local_train(self, model, X, y, velocity):
+        model.train()
+
+        use_momentum = (velocity is not None and self.momentum > 0)
+
+        data_size = X.shape[0]
+        batch_size = min(32, data_size)
+
+        for _ in range(self.R_local):
+            # batching
+            idx = torch.randperm(data_size, device=self.device)[:batch_size]
+            X_batch = X[idx]
+            y_batch = y[idx]
+            
+            pred = model(X_batch)
+            loss = self.loss_fn(pred, y_batch)
+
+            grads = torch.autograd.grad(loss, model.parameters(), create_graph=False)
+
+            with torch.no_grad():
+                for i, (p, g) in enumerate(zip(model.parameters(), grads)):
+                    if use_momentum:
+                        velocity[i] = self.momentum * velocity[i] + g
+                        update = velocity[i]
+                    else:
+                        update = g
+
+                    p -= self.lrate * update
+
+        return loss
 
     # --------------------------------
     # Run
@@ -65,12 +94,12 @@ class FedAvg:
         true_weights = data.get("true_weights", None)
 
         device = self.device
-        n_clients, _, _ = X_train.shape
+        n_clients = X_train.shape[0]
 
-        X_train = torch.as_tensor(X_train, dtype=torch.float32, device=device)
-        y_train = torch.tensor(y_train, dtype=torch.float32, device=device)
-        X_val = torch.as_tensor(X_val, dtype=torch.float32, device=device)
-        y_val = torch.tensor(y_val, dtype=torch.float32, device=device)
+        X_train = X_train.to(device)
+        y_train = y_train.to(device)
+        X_val = X_val.to(device)
+        y_val = y_val.to(device)
 
         if cluster_labels is not None:
             cluster_labels = torch.tensor(cluster_labels, device=device)
@@ -81,10 +110,39 @@ class FedAvg:
         self.client_models = [copy.deepcopy(self.global_model) for _ in range(n_clients)]
         self.loss_history = torch.zeros((n_clients, self.R), device=device)
 
+        # Initialize velocities
+        if self.momentum > 0:
+            self.velocities = []
+            for model in self.client_models:
+                velocity = [torch.zeros_like(p, device=device) for p in model.parameters()]
+                self.velocities.append(velocity)
+
         # --------------------------------
         # Main loop
         # --------------------------------
         for r in range(self.R):
+            # After round 0, add this:
+            # if r == 0:
+            #     print("=== SHAPE DIAGNOSTICS ===")
+            #     print(f"X_train: {X_train.shape}")   # expect [20, 500, 3, 32, 32]
+            #     print(f"y_train: {y_train.shape}")   # expect [20, 500]
+            #     print(f"X_val:   {X_val.shape}")     # expect [20, N_val, 3, 32, 32]
+            #     print(f"y_val:   {y_val.shape}")     # expect [20, N_val]
+                
+            #     # Check val label distribution per client
+            #     for i in range(min(3, n_clients)):
+            #         print(f"Client {i} val label distribution: {torch.bincount(y_val[i].long())}")
+                
+            #     # Sanity check: what does a random model score?
+            #     random_model = self.model_fn().to(device)
+            #     preds = self.get_predictions(random_model, X_val[0])
+            #     pred_labels = preds.argmax(dim=1)
+            #     correct = (pred_labels == y_val[0]).float().mean()
+            #     print(f"Random model accuracy on client 0 val: {correct.item():.4f}")  # expect ~0.10
+
+            # LR decay
+            if self.lrate_decay is not None:
+                self.lrate = self.lrate_init * (self.lrate_decay ** r)
 
             # Step 1: sample clients
             m = min(self.S, n_clients)
@@ -96,21 +154,15 @@ class FedAvg:
             # Step 2: local training
             for i in selected_clients:
                 local_model = copy.deepcopy(self.global_model)
-                local_model.train()
-
-                optimizer = torch.optim.SGD(local_model.parameters(), lr=self.lrate)
+                velocity = self.velocities[i] if self.momentum > 0 else None
 
                 X_i = X_train[i]
                 y_i = y_train[i]
 
+                loss = self.local_train(local_model, X_i, y_i, velocity)
+
                 dataset_size = X_i.shape[0]
                 local_sizes.append(dataset_size)
-
-                optimizer.zero_grad()
-                pred = local_model(X_i)
-                loss = self.loss_fn(pred.squeeze(), y_i.squeeze())
-                loss.backward()
-                optimizer.step()
 
                 local_params_list.append({
                     k: v.clone()
@@ -118,6 +170,7 @@ class FedAvg:
                 })
 
                 self.loss_history[i, r] = loss.detach()
+                print(f"Iter {r}, Client {i}, Loss: {loss.detach().item():.4f}")
 
             # Step 3: aggregation
             total_size = sum(local_sizes)
@@ -135,8 +188,16 @@ class FedAvg:
             for i in range(n_clients):
                 self.client_models[i].load_state_dict(self.global_model.state_dict())
 
+            # reset velocities to zero after aggregation
+            # After Step 4 (broadcast global model)
+            if self.momentum > 0:
+                for i in range(n_clients):
+                    self.velocities[i] = [
+                        torch.zeros_like(p) for p in self.client_models[i].parameters()
+                    ]
+
             # --------------------------------
-            # Step 5: metric evaluation (aligned with PersFL)
+            # Step 5: metric evaluation 
             # --------------------------------
             metrics_sums = {
                 name: torch.tensor(0.0, device=device)
@@ -168,6 +229,7 @@ class FedAvg:
                             )
 
                         metric_value = metric_fn(val_predictions, y_val[i])
+                        print(f"{metric_name}: {metric_value.item():.4f}")
 
                     metrics_sums[metric_name] += metric_value.detach()
 
