@@ -82,12 +82,13 @@ echo "========================================"
 srun python scripts/main.py \
         --n_clients 200 \
         --n_clusters 1 \
-        --model cnn \
+        --n_classes 10 \
+	--model cnn \
         --dataset cifar10 \
         --algo FedAvg \
         --R 200 \
         --R_local 5 \
-        --lrate 0.01 \
+        --lrate 0.2 \
         --momentum 0.9 \
         --lrate_decay 0.999 \
         --S 50 \
