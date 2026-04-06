@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=persfl_tree
-#SBATCH --time=04:00:00
+#SBATCH --time=05:00:00
 #SBATCH --mem=16G
 #SBATCH --cpus-per-task=3 # task is job instance created from the array; each task runs .sh independently
 #SBATCH --array=0-39

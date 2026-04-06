@@ -32,7 +32,7 @@ MODELS = {
         "input_shape": (3, 32, 32), 
         "n_classes": 10}),
     "decision_tree": ModelSpec(module="model.tree", cls="DecisionTree", default_params={
-        "max_depth": 10}),
+        "max_depth": 5}),
     "random_forest": ModelSpec(module="model.forest", cls="RandomForest", default_params={
         "max_depth": 10, 
         "n_estimators": 10})
