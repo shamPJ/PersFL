@@ -87,7 +87,7 @@ class Algorithm1:
                 with torch.no_grad():
                     for i, (p, g) in enumerate(zip(model.parameters(), grads)):
                         if use_momentum:
-                            velocity[i] = self.momentum * velocity[i] + g
+                            velocity[i] = self.momentum * velocity[i].to(self.device) + g
                             update = velocity[i]
                         else:
                             update = g
@@ -196,9 +196,9 @@ class Algorithm1:
                 else:
                     losses = self.candidate_losses(self.client_models[i], all_candidate_params[i], X_train[i], y_train[i])
                     best_idx = torch.argmin(losses)
-                    best_w = all_candidate_params[i][best_idx]
+                    best_w = all_candidate_params[i][best_idx]  # stored on CPU
                     # update client model with best candidate params
-                    self.client_models[i].load_state_dict(best_w)
+                    self.client_models[i].load_state_dict({k: v.to(self.device) for k, v in best_w.items()})
                     # update velocity if using momentum
                     if self.momentum > 0:
                         self.velocities[i] = velocities_on_candidate_set[best_idx]
@@ -267,7 +267,9 @@ class Algorithm1:
             batch_size = min(16, data_size)
 
             # reset velocity for this candidate if using momentum
-            velocities_candidate = [torch.zeros_like(p) for p in candidate_model.parameters()]
+            # velocities_candidate = [torch.zeros_like(p) for p in candidate_model.parameters()]
+            # initialize velocities on CPU
+            velocities_candidate = [torch.zeros_like(p, device='cpu') for p in candidate_model.parameters()]
 
             for r in range(self.R_local):
                 # Shuffle the dataset at the start of each epoch
@@ -289,13 +291,20 @@ class Algorithm1:
                     with torch.no_grad():
                         for j, (p, g) in enumerate(zip(candidate_model.parameters(), grads)):
                             if self.momentum > 0:
-                                velocities_candidate[j] = self.momentum * velocities_candidate[j] + g
-                                update = velocities_candidate[j]
+                                v = velocities_candidate[j].to(self.device)
+                                v = self.momentum * v + g
+                                p -= self.lrate * v
+                                velocities_candidate[j] = v.cpu()
                             else:
                                 update = g
                             p -= self.lrate * update
             
-            updated_params = [p.clone() for p in candidate_model.parameters()]
+            # updated_params = [p.clone() for p in candidate_model.parameters()]
+            # velocities.append(velocities_candidate)
+
+            # save updated parameters on CPU
+            updated_params = [p.clone().cpu() for p in candidate_model.parameters()]
+            candidate_params.append({name: p for name, p in zip(param_names, updated_params)})
             velocities.append(velocities_candidate)
 
             # Explicitly delete and free GPU memory
@@ -303,10 +312,10 @@ class Algorithm1:
             torch.cuda.empty_cache()
 
             # Store updated candidate weights as independent cloned state_dict
-            candidate_params.append({
-                name: p.clone()
-                for name, p in zip(param_names, updated_params)
-            })
+            # candidate_params.append({
+            #     name: p.clone()
+            #     for name, p in zip(param_names, updated_params)
+            # })
 
         # Restore model to original parameters
         for p, bp in zip(model.parameters(), base_params):
