@@ -203,7 +203,7 @@ class Algorithm1:
                     if self.momentum > 0:
                         self.velocities[i] = velocities_on_candidate_set[best_idx]
                 self.loss_history[i, r] = losses[best_idx].detach().cpu().numpy()
-                print(f"Iter {r}, Client {i}, Loss: {losses[best_idx].item():.4f}")
+                # print(f"Iter {r}, Client {i}, Loss: {losses[best_idx].item():.4f}")
                 # -----------------------------
                 # Evaluate metrics for this iteration
                 # -----------------------------

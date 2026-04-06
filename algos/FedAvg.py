@@ -59,28 +59,31 @@ class FedAvg:
         data_size = X.shape[0]
         batch_size = min(32, data_size)
 
-        for _ in range(self.R_local):
-            # batching
-            idx = torch.randperm(data_size, device=self.device)[:batch_size]
-            X_batch = X[idx]
-            y_batch = y[idx]
-            
-            pred = model(X_batch)
-            loss = self.loss_fn(pred, y_batch)
+        for r in range(self.R_local):
+            # Shuffle the dataset at the start of each epoch
+            perm = torch.randperm(data_size, device=self.device)
+            X_shuffled = X[perm]
+            y_shuffled = y[perm]
 
-            grads = torch.autograd.grad(loss, model.parameters(), create_graph=False)
+            # Iterate over minibatches
+            for start in range(0, data_size, batch_size):
+                end = start + batch_size
+                X_batch = X_shuffled[start:end]
+                y_batch = y_shuffled[start:end]
 
-            with torch.no_grad():
-                for i, (p, g) in enumerate(zip(model.parameters(), grads)):
-                    if use_momentum:
-                        velocity[i] = self.momentum * velocity[i] + g
-                        update = velocity[i]
-                    else:
-                        update = g
+                pred = model(X_batch)
+                loss = self.loss_fn(pred, y_batch)
 
-                    p -= self.lrate * update
+                grads = torch.autograd.grad(loss, model.parameters(), create_graph=False)
 
-        return loss
+                with torch.no_grad():
+                    for i, (p, g) in enumerate(zip(model.parameters(), grads)):
+                        if use_momentum:
+                            velocity[i] = self.momentum * velocity[i] + g
+                            update = velocity[i]
+                        else:
+                            update = g
+                        p -= self.lrate * update
 
     # --------------------------------
     # Run
@@ -159,7 +162,7 @@ class FedAvg:
                 X_i = X_train[i]
                 y_i = y_train[i]
 
-                loss = self.local_train(local_model, X_i, y_i, velocity)
+                self.local_train(local_model, X_i, y_i, velocity)
 
                 dataset_size = X_i.shape[0]
                 local_sizes.append(dataset_size)
@@ -169,7 +172,7 @@ class FedAvg:
                     for k, v in local_model.state_dict().items()
                 })
 
-                self.loss_history[i, r] = loss.item()
+                # self.loss_history[i, r] = loss.detach().cpu().item()
                 # print(f"Iter {r}, Client {i}, Loss: {loss.detach().item():.4f}")
 
             # Step 3: aggregation
@@ -187,6 +190,15 @@ class FedAvg:
             # Step 4: broadcast global model
             for i in range(n_clients):
                 self.client_models[i].load_state_dict(self.global_model.state_dict())
+
+            # training loss after aggr
+            loss = 0
+            for i in range(n_clients):
+                pred = self.get_predictions(
+                                self.client_models[i],
+                                X_train[i]
+                            )
+                self.loss_history[i, r] = self.loss_fn(pred, y_train[i]).detach().cpu().item()
 
             # reset velocities to zero after aggregation
             # After Step 4 (broadcast global model)
