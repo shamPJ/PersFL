@@ -24,18 +24,18 @@ for SEED in "${SEEDS[@]}"; do
     START_EXP=$SECONDS
 
     python scripts/main.py \
-        --n_clients 20 \
+        --n_clients 50 \
         --n_clusters 1 \
         --n_classes 10 \
         --model cnn \
         --dataset cifar10 \
         --algo FedAvg \
-        --R 500 \
-        --R_local 10 \
+        --R 200 \
+        --R_local 5 \
         --lrate 0.01 \
         --momentum 0.9 \
         --lrate_decay 0.999 \
-        --S 10 \
+        --S 30 \
         --fname ${OUT_DIR}/FedAvg/cnn_cifar10_iid_${SEED}.csv \
         --device cpu \
         --problem classification \

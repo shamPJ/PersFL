@@ -4,8 +4,16 @@ D_LIST=(2)
 SEEDS=(0 1 2)
 
 # Output directory
-OUT_DIR="results/linear_syn_dm_algo2"
+export PYTHONPATH=$PYTHONPATH:$PWD
+
+OUT_DIR="results/linear_syn_dm"
 mkdir -p $OUT_DIR
+
+# Algorithm subdirectories
+ALGOS=("Algorithm2_SKLearn")
+for ALG in "${ALGOS[@]}"; do
+    mkdir -p "${OUT_DIR}/${ALG}"
+done
 
 # timing 
 START=$SECONDS
@@ -19,21 +27,19 @@ for D in "${D_LIST[@]}"; do
         echo "========================================"
 
         # Construct CSV file path
-        F_PATH="${OUT_DIR}/linear_syn_dm_${D}_${SEED}.csv"
         START_EXP=$SECONDS
 
-        python main.py \
+        python scripts/main.py \
             --n_clients 100 \
-            --n_clusters 2 \
+            --n_clusters 3 \
             --n_features $D \
-            --model linreg \
+            --model decision_tree \
+            --lmbd 0.05 \
             --dataset synthetic \
-            --algo Algorithm2 \
-            --R 500 \
-            --R_local 0 \
-            --lrate 0.01 \
-            --S 20 \
-            --fname $F_PATH \
+            --algo Algorithm2_SKLearn \
+            --R 200 \
+            --S 30 \
+            --fname ${OUT_DIR}/Algorithm2_SKLearn/dt_synthetic_${SEED}.csv \
             --device cpu \
             --problem regression \
             --seed $SEED

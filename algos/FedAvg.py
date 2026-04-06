@@ -169,8 +169,8 @@ class FedAvg:
                     for k, v in local_model.state_dict().items()
                 })
 
-                self.loss_history[i, r] = loss.detach()
-                print(f"Iter {r}, Client {i}, Loss: {loss.detach().item():.4f}")
+                self.loss_history[i, r] = loss.item()
+                # print(f"Iter {r}, Client {i}, Loss: {loss.detach().item():.4f}")
 
             # Step 3: aggregation
             total_size = sum(local_sizes)
@@ -229,7 +229,7 @@ class FedAvg:
                             )
 
                         metric_value = metric_fn(val_predictions, y_val[i])
-                        print(f"{metric_name}: {metric_value.item():.4f}")
+                        # print(f"{metric_name}: {metric_value.item():.4f}")
 
                     metrics_sums[metric_name] += metric_value.detach()
 

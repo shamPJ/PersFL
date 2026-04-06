@@ -80,7 +80,8 @@ if __name__ == "__main__":
     metrics = {}
     if problem_type == "regression":
         loss_fn = nn.MSELoss()
-        metrics = {"MSE_val": MSE, "MSE_params": MSE_params}
+        # metrics = {"MSE_val": MSE, "MSE_params": MSE_params}
+        metrics = {"MSE_val": MSE}
 
     elif problem_type == "classification":
         loss_fn = nn.CrossEntropyLoss()
@@ -89,8 +90,9 @@ if __name__ == "__main__":
     # -----------------------------
     # Model factory
     # -----------------------------
-    def model_fn():
-        return ModelCls(**full_model_params)
+    def model_fn(**extra_params):
+        # Python dict unpacking follows last-write-wins
+        return ModelCls(**full_model_params, **extra_params)
 
     # -----------------------------
     # Load dataset
@@ -117,7 +119,7 @@ if __name__ == "__main__":
     # -----------------------------
     # Collect metrics
     # -----------------------------
-    loss_hist = algo.loss_history.detach().cpu().numpy()  # shape = (n_clients, R)
+    loss_hist = algo.loss_history # shape = (n_clients, R)
     
     # save data 
     flat_data  = flatten_dict(full_data_params, parent_key="data")

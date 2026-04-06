@@ -25,8 +25,17 @@ class AlgoSpec:
 
 # Registries
 MODELS = {
-    "linreg": ModelSpec(module="model.linreg", cls="LinReg", default_params={"n_features": 2, "bias": False}),
-    "cnn": ModelSpec(module="model.cnn", cls="CNN", default_params={"input_shape": (3, 32, 32), "n_classes": 10})
+    "linreg": ModelSpec(module="model.linreg", cls="LinReg", default_params={
+        "n_features": 2, 
+        "bias": False}),
+    "cnn": ModelSpec(module="model.cnn", cls="CNN", default_params={
+        "input_shape": (3, 32, 32), 
+        "n_classes": 10}),
+    "decision_tree": ModelSpec(module="model.tree", cls="DecisionTree", default_params={
+        "max_depth": 10}),
+    "random_forest": ModelSpec(module="model.forest", cls="RandomForest", default_params={
+        "max_depth": 10, 
+        "n_estimators": 10})
 }
 
 DATASETS = {
@@ -44,7 +53,7 @@ DATASETS = {
         "n_clients": 10,
         "n_clusters": 1,
         "n_classes": 10,
-        "n_samples": 500,
+        "n_samples": 100,
         "n_samples_val": 1000,
         "seed": 0
     })
@@ -66,6 +75,11 @@ ALGOS = {
         "S": 30,
         "R": 1500,
         "R_local": 0}),
+
+    "Algorithm2_SKLearn": AlgoSpec(module="algos.Algorithm2_SKLearn", cls="Algorithm2_SKLearn", default_params={
+        "lmbd": 1,
+        "S": 30,
+        "R": 100}),
     
     "FedAvg": AlgoSpec(module="algos.FedAvg", cls="FedAvg", default_params={
         "lrate": 0.01,

@@ -112,16 +112,16 @@ def generate_clustered_cifar10(
 # ----------------------
 # Example usage
 # ----------------------
-dataset = generate_clustered_cifar10(
-    n_clusters=5,
-    n_clients=50,
-    n_samples=50,
-    n_samples_val=20,
-    n_classes=3,
-    seed=42
-)
+# dataset = generate_clustered_cifar10(
+#     n_clusters=5,
+#     n_clients=50,
+#     n_samples=50,
+#     n_samples_val=20,
+#     n_classes=3,
+#     seed=42
+# )
 
-print("Train shape:", dataset["train"][0].shape)
-print("Val shape:", dataset["val"][0].shape)
-print("Cluster classes:", dataset["cluster_classes"])
-print("Cluster labels per client:", dataset["cluster_labels"][:10])
+# print("Train shape:", dataset["train"][0].shape)
+# print("Val shape:", dataset["val"][0].shape)
+# print("Cluster classes:", dataset["cluster_classes"])
+# print("Cluster labels per client:", dataset["cluster_labels"][:10])

@@ -1,21 +1,34 @@
-from sklearn.tree import DecisionTreeRegressor
+import torch
 import numpy as np
+from sklearn.tree import DecisionTreeRegressor
 
 class DecisionTree:
     """
-    Decision Tree with callable interface: model(X) -> predictions
+    Wrapper to unify sklearn model with torch-based pipeline
     """
-    def __init__(self, max_depth=None, seed=42):
+
+    def __init__(self, max_depth=3, seed=0):
         self.model = DecisionTreeRegressor(
             max_depth=max_depth,
             random_state=seed
         )
+        
+    def _to_numpy(self, x):
+        if isinstance(x, torch.Tensor):
+            return x.detach().cpu().numpy()
+        return x
 
-    def fit(self, X, y):
-        self.model.fit(X, y)
+    def _to_tensor(self, x):
+        if isinstance(x, np.ndarray):
+            return torch.from_numpy(x).float()
+        return x
 
-    def __call__(self, X):
-        """
-        Makes the instance callable: tree(X)
-        """
-        return self.model.predict(X)
+    def fit(self, X, y, sample_weight=None):
+        X = self._to_numpy(X)
+        y = self._to_numpy(y).reshape(-1)
+        self.model.fit(X, y, sample_weight=sample_weight)
+
+    def predict(self, X):
+        X = self._to_numpy(X)
+        pred = self.model.predict(X)
+        return pred

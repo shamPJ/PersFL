@@ -5,8 +5,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 dir = "cnn_cifar10_iid/Algorithm1"
-csvs = glob.glob(os.path.join("results", dir, "cnn_cifar10_iid_1.csv"))
-
+dir = "cnn_cifar10_iid/FedAvg"
+csvs = glob.glob(os.path.join("results", dir, "cnn_cifar10_iid_0.csv"))
+print(csvs)
 # dfs = []
 # for f in csvs:
     # fname = os.path.basename(f)
@@ -20,6 +21,7 @@ csvs = glob.glob(os.path.join("results", dir, "cnn_cifar10_iid_1.csv"))
 
 # df = pd.concat(dfs, ignore_index=True)
 df = pd.read_csv(csvs[0], sep=',')
+# df = pd.read_csv(csvs, sep=',')
 plt.plot(df['iter'], df['loss_mean'])
 plt.show()
 plt.plot(df['iter'], df['accuracy'])

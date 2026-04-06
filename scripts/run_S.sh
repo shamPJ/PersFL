@@ -19,7 +19,6 @@ export PYTHONPATH=$PYTHONPATH:$PWD
 # ===============================
 # Sweep grids
 # ===============================
-# Sweep parameters
 PARAM_LIST=(10 20 30 50)         # candidate set size grid
 SEEDS=(0 1 2 3 4 5 6 7 8 9)  # repetitions
 

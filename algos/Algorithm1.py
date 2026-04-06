@@ -68,24 +68,30 @@ class Algorithm1:
         batch_size = min(32, data_size)
 
         for _ in range(self.R_local):
-            # batching
-            idx = torch.randperm(data_size, device=self.device)[:batch_size]
-            X_batch = X[idx]
-            y_batch = y[idx]
-            
-            pred = model(X_batch)
-            loss = self.loss_fn(pred, y_batch)
-    
-            grads = torch.autograd.grad(loss, model.parameters(), create_graph=False)
+            # Shuffle the dataset at the start of each epoch
+            perm = torch.randperm(data_size, device=self.device)
+            X_shuffled = X[perm]
+            y_shuffled = y[perm]
 
-            with torch.no_grad():
-                for i, (p, g) in enumerate(zip(model.parameters(), grads)):
-                    if use_momentum:
-                        velocity[i] = self.momentum * velocity[i] + g
-                        update = velocity[i]
-                    else:
-                        update = g
-                    p -= self.lrate * update
+            # Iterate over minibatches
+            for start in range(0, data_size, batch_size):
+                end = start + batch_size
+                X_batch = X_shuffled[start:end]
+                y_batch = y_shuffled[start:end]
+
+                pred = model(X_batch)
+                loss = self.loss_fn(pred, y_batch)
+
+                grads = torch.autograd.grad(loss, model.parameters(), create_graph=False)
+
+                with torch.no_grad():
+                    for i, (p, g) in enumerate(zip(model.parameters(), grads)):
+                        if use_momentum:
+                            velocity[i] = self.momentum * velocity[i] + g
+                            update = velocity[i]
+                        else:
+                            update = g
+                        p -= self.lrate * update
     
     # --------------------------------
     # Run method: 
@@ -144,7 +150,7 @@ class Algorithm1:
             if self.lrate_decay is not None:
                 self.lrate = self.lrate_init * (self.lrate_decay ** r)
 
-            # --- local updates ---
+            # --- Local updates ---
             for i in range(n_clients):
                 self.local_train(
                     self.client_models[i],
@@ -152,6 +158,7 @@ class Algorithm1:
                     y_train[i],
                     self.velocities[i] if self.momentum > 0 else None
                 )
+
             # Step 1: sample candidate neighbors (exclude self)
             candidate_indices = []
             for i in range(n_clients):
@@ -195,7 +202,7 @@ class Algorithm1:
                     # update velocity if using momentum
                     if self.momentum > 0:
                         self.velocities[i] = velocities_on_candidate_set[best_idx]
-                self.loss_history[i, r] = losses[best_idx]
+                self.loss_history[i, r] = losses[best_idx].detach().cpu().numpy()
                 print(f"Iter {r}, Client {i}, Loss: {losses[best_idx].item():.4f}")
                 # -----------------------------
                 # Evaluate metrics for this iteration
@@ -252,26 +259,44 @@ class Algorithm1:
 
         velocities = []
         for i in range(S):
-            # Forward pass for candidate i
-            # on candidate neighbor's data
-            pred = model(X_candidates[i])
-            loss = self.loss_fn(pred, y_candidates[i])
+            # create a fresh copy of the model for candidate i
+            candidate_model = self.model_fn().to(device)
+            candidate_model.load_state_dict(model.state_dict())
 
-            # Compute gradients w.r.t. current parameters (decoupled)
-            grads = torch.autograd.grad(loss, model.parameters(), create_graph=False)
-            updated_params = []
-            velocities_candidate = []
-            with torch.no_grad():
-                for j, (p, g) in enumerate(zip(base_params, grads)):
-                    if self.momentum > 0:
-                        update = self.momentum * velocity[j] + g
-                        velocities_candidate.append(update)
-                    else:
-                        update = g
-                    updated_params.append(p - self.lrate * update)
+            data_size = X_candidates[i].shape[0]
+            batch_size = min(32, data_size)
+
+            # reset velocity for this candidate if using momentum
+            velocities_candidate = [torch.zeros_like(p) for p in candidate_model.parameters()]
+
+            for r in range(self.R_local):
+                # Shuffle the dataset at the start of each epoch
+                perm = torch.randperm(data_size, device=self.device)
+                X_shuffled = X_candidates[i][perm]
+                y_shuffled = y_candidates[i][perm]
+
+                # Iterate over minibatches
+                for start in range(0, data_size, batch_size):
+                    end = start + batch_size
+                    X_batch = X_shuffled[start:end]
+                    y_batch = y_shuffled[start:end]
+
+                    pred = candidate_model(X_batch)
+                    loss = self.loss_fn(pred, y_batch)
+
+                    grads = torch.autograd.grad(loss, candidate_model.parameters(), create_graph=False)
+
+                    with torch.no_grad():
+                        for j, (p, g) in enumerate(zip(model.parameters(), grads)):
+                            if self.momentum > 0:
+                                velocities_candidate[j] = self.momentum * velocities_candidate[j] + g
+                                update = velocities_candidate[j]
+                            else:
+                                update = g
+                            p -= self.lrate * update
             
+            updated_params = [p.clone() for p in candidate_model.parameters()]
             velocities.append(velocities_candidate)
-            # updated_params = [p - self.lrate * g for p, g in zip(base_params, grads)]
 
             # Store updated candidate weights as independent cloned state_dict
             candidate_params.append({

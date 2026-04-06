@@ -43,6 +43,7 @@ def generate_data(n_clusters, n_clients, n_samples, n_samples_val, n_features, n
         for idx, (X_t, X_v, y_t, y_v) in enumerate(cluster_node_data):
             X_train[i*n_ds + idx] = scaler.transform(X_t)
             X_val[i*n_ds + idx] = scaler.transform(X_v)
+
             y_train[i*n_ds + idx] = y_t
             y_val[i*n_ds + idx] = y_v
 

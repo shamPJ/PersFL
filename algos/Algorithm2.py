@@ -156,7 +156,7 @@ class Algorithm2:
                 best_idx = torch.argmin(losses)
 
                 self.client_models[i] = all_candidate_models[i][best_idx]
-                self.loss_history[i, r] = losses[best_idx]
+                self.loss_history[i, r] = losses[best_idx].detach().cpu().numpy()
 
                 # -----------------------------
                 # Evaluate metrics for this iteration

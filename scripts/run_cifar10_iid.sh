@@ -26,7 +26,7 @@ OUT_DIR="results/cnn_cifar10_iid"
 mkdir -p $OUT_DIR
 
 # Algorithm subdirectories
-ALGOS=("Algorithm1" "Algorithm2")
+ALGOS=("Algorithm1" "Algorithm2" "FedAvg")
 for ALG in "${ALGOS[@]}"; do
     mkdir -p "${OUT_DIR}/${ALG}"
 done
@@ -45,23 +45,23 @@ echo "========================================"
 # ===============================
 # Run experiment
 # ===============================
-srun python scripts/main.py \
-    --n_clients 20 \
-    --n_clusters 1 \
-    --n_classes 10 \
-    --model cnn \
-    --dataset cifar10 \
-    --algo Algorithm1 \
-    --R 500 \
-    --R_local 5 \
-    --lrate 0.01 \
-    --momentum 0 \
-    --lrate_decay 0.999 \
-    --S 10 \
-    --fname ${OUT_DIR}/Algorithm1/cnn_cifar10_iid_${SEED}.csv \
-    --device cuda \
-    --problem classification \
-    --seed $SEED 
+# srun python scripts/main.py \
+#     --n_clients 20 \
+#     --n_clusters 1 \
+#     --n_classes 10 \
+#     --model cnn \
+#     --dataset cifar10 \
+#     --algo Algorithm1 \
+#     --R 500 \
+#     --R_local 5 \
+#     --lrate 0.01 \
+#     --momentum 0 \
+#     --lrate_decay 0.999 \
+#     --S 10 \
+#     --fname ${OUT_DIR}/Algorithm1/cnn_cifar10_iid_${SEED}.csv \
+#     --device cuda \
+#     --problem classification \
+#     --seed $SEED 
     
 # srun python main.py \
 #     --n_clients 150 \
@@ -78,6 +78,26 @@ srun python scripts/main.py \
 #     --device cuda \
 #     --problem regression \
 #     --seed $SEED 
+
+srun python scripts/main.py \
+        --n_clients 50 \
+        --n_clusters 1 \
+        --n_classes 10 \
+        --n_samples 100 \
+        --n_samples_val 1000 \
+        --model cnn \
+        --dataset cifar10 \
+        --algo FedAvg \
+        --R 200 \
+        --R_local 5 \
+        --lrate 0.01 \
+        --momentum 0.9 \
+        --lrate_decay 0.999 \
+        --S 30 \
+        --fname ${OUT_DIR}/FedAvg/cnn_cifar10_iid_${SEED}.csv \
+        --device cuda \
+        --problem classification \
+        --seed $SEED 
 
 
 
