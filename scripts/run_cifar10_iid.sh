@@ -80,11 +80,8 @@ echo "========================================"
 #     --seed $SEED 
 
 srun python scripts/main.py \
-        --n_clients 50 \
+        --n_clients 200 \
         --n_clusters 1 \
-        --n_classes 10 \
-        --n_samples 100 \
-        --n_samples_val 1000 \
         --model cnn \
         --dataset cifar10 \
         --algo FedAvg \
@@ -93,7 +90,7 @@ srun python scripts/main.py \
         --lrate 0.01 \
         --momentum 0.9 \
         --lrate_decay 0.999 \
-        --S 30 \
+        --S 50 \
         --fname ${OUT_DIR}/FedAvg/cnn_cifar10_iid_${SEED}.csv \
         --device cuda \
         --problem classification \

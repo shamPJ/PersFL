@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from torch.utils.data import Subset
 from torchvision import datasets, transforms
+from sklearn.model_selection import train_test_split
 
 def load_cifar10(root="./data_cifar10"):
 
@@ -78,6 +79,9 @@ def generate_clustered_cifar10(
     for i, cluster_id in enumerate(cluster_labels):
         # for ech client, get its cluster's classes and sample from them
         classes = cluster_classes[cluster_id]
+        # e.g. {4:0, 0:1, 5:2, 6:3} to remap original labels to 0,...,n_classes-1
+        # for CE loss 
+        label_map = {orig: new for new, orig in enumerate(classes)} 
         client_indices = []
 
         # Collect samples from cluster's classes
@@ -89,10 +93,12 @@ def generate_clustered_cifar10(
 
         rng.shuffle(client_indices)
         # If not enough samples, sample with replacement from cluster's classes
+        all_class_indices = {c: np.where(y == c)[0].tolist() for c in classes}
         while len(client_indices) < n_samples + n_samples_val:
             c = rng.choice(classes)
-            idxs_c = np.where(y == c)[0].tolist()
-            client_indices.append(rng.choice(idxs_c))
+            # remove already taken indices to avoid duplicates            
+            available = list(set(all_class_indices[c]) - set(client_indices))
+            client_indices.append(rng.choice(available))
 
         train_idxs = client_indices[:n_samples]
         val_idxs = client_indices[n_samples:n_samples + n_samples_val]
@@ -107,21 +113,88 @@ def generate_clustered_cifar10(
         "val": (X_val, y_val),
         "cluster_labels": cluster_labels.tolist(),
         "cluster_classes": cluster_classes
+    }   
+
+def generate_rotated_cifar10(n_clusters=4, n_clients=100, seed=0):
+    """
+    Generate rotated CIFAR dataset partitioned into clusters by rotation.
+
+    Args:
+        n_clusters (int): Number of rotation clusters
+        n_clients (int): Number of clients
+        seed (int): Random seed for reproducibility
+
+    Returns:
+        dict with keys:
+            "train": (X_train, y_train) -- torch tensors (n_clients, n_samples, C,H,W)
+            "val":   (X_val, y_val)     -- torch tensors (n_clients, n_samples_val, C,H,W)
+            "cluster_labels": list of length n_clients
+            "cluster_rotations": list of rotations per cluster
+    """
+    rng = np.random.default_rng(seed)
+
+    base_train = datasets.CIFAR10(
+        root="./data_cifar10", train=True, download=True, transform=transforms.ToTensor()
+    )
+    base_test = datasets.CIFAR10(
+        root="./data_cifar10", train=False, download=True, transform=transforms.ToTensor()
+    )
+
+    rotations_all = [0, 90, 180, 270]
+    assert n_clusters <= len(rotations_all), "n_clusters cannot exceed number of available rotations"
+    rotations = rotations_all[:n_clusters]
+
+    # Convert to tensors
+    X_base_train = torch.stack([t[0] for t in base_train])
+    y_base_train = torch.tensor([t[1] for t in base_train])
+    X_base_test = torch.stack([t[0] for t in base_test])
+    y_base_test = torch.tensor([t[1] for t in base_test])
+
+    # Calculate samples per client
+    n_clients_per_cluster = n_clients // n_clusters
+    
+    n_samples_per_client = X_base_train.shape[0] // n_clients_per_cluster
+    n_samples_val_per_client = X_base_test.shape[0] // n_clients_per_cluster
+    print(n_clients_per_cluster, n_samples_per_client, n_samples_val_per_client)
+
+    X_train = torch.zeros((n_clients, n_samples_per_client, *X_base_train.shape[1:]))
+    y_train = torch.zeros((n_clients, n_samples_per_client), dtype=torch.long)
+    X_val = torch.zeros((n_clients, n_samples_val_per_client, *X_base_test.shape[1:]))
+    y_val = torch.zeros((n_clients, n_samples_val_per_client), dtype=torch.long)
+
+    cluster_labels = np.zeros(n_clients, dtype=int)
+
+    # Generate rotated datasets for each cluster
+    client_idx = 0
+    for cluster_id, angle in enumerate(rotations):
+        transform_rot = transforms.Lambda(lambda x: transforms.functional.rotate(x, angle))
+        X_train_rot = torch.stack([transform_rot(img) for img in X_base_train])
+        X_val_rot = torch.stack([transform_rot(img) for img in X_base_test])
+
+        # Shuffle indices
+        train_indices = rng.permutation(X_train_rot.shape[0])
+        val_indices = rng.permutation(X_val_rot.shape[0])
+
+        # Split data among clients assigned to this cluster
+        for i in range(n_clients_per_cluster):
+            start = i * n_samples_per_client
+            end = i * n_samples_per_client + n_samples_per_client
+            
+            X_train[client_idx] = X_train_rot[train_indices[start:end]]
+            y_train[client_idx] = y_base_train[train_indices[start:end]]
+
+            start = i * n_samples_val_per_client
+            end = i * n_samples_val_per_client + n_samples_val_per_client
+            
+            X_val[client_idx] = X_val_rot[val_indices[start:end]]
+            y_val[client_idx] = y_base_test[val_indices[start:end]]
+
+            cluster_labels[client_idx] = cluster_id
+            client_idx += 1
+
+    return {
+        "train": (X_train, y_train),
+        "val": (X_val, y_val),
+        "cluster_labels": cluster_labels.tolist(),
+        "cluster_rotations": rotations
     }
-
-# ----------------------
-# Example usage
-# ----------------------
-# dataset = generate_clustered_cifar10(
-#     n_clusters=5,
-#     n_clients=50,
-#     n_samples=50,
-#     n_samples_val=20,
-#     n_classes=3,
-#     seed=42
-# )
-
-# print("Train shape:", dataset["train"][0].shape)
-# print("Val shape:", dataset["val"][0].shape)
-# print("Cluster classes:", dataset["cluster_classes"])
-# print("Cluster labels per client:", dataset["cluster_labels"][:10])

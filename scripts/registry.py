@@ -49,15 +49,20 @@ DATASETS = {
         "noise_weight": 0 
     }),
 
-    "cifar10": DatasetSpec(module="data.cifar10", loader="generate_clustered_cifar10", default_params={
-        "n_clients": 10,
-        "n_clusters": 1,
-        "n_classes": 10,
-        "n_samples": 100,
-        "n_samples_val": 1000,
+    # "cifar10": DatasetSpec(module="data.cifar10", loader="generate_clustered_cifar10", default_params={
+    #     "n_clients": 10,
+    #     "n_clusters": 1,
+    #     "n_classes": 10,
+    #     "n_samples": 100,
+    #     "n_samples_val": 1000,
+    #     "seed": 0
+    # })
+
+    "cifar10": DatasetSpec(module="data.cifar10", loader="generate_rotated_cifar10", default_params={
+        "n_clients": 200,
+        "n_clusters": 4,
         "seed": 0
     })
-
 }
 
 ALGOS = {

@@ -4,13 +4,7 @@ import random
 from utils.metrics import MSE, accuracy, F1
 from joblib import Parallel, delayed
 import os
-
-class Algorithm2_SKLearn:
-    def __init__(self, model_fn, ..., n_jobs=None):
-        self.n_jobs = n_jobs if n_jobs is not None else self._get_default_n_jobs()
-
-    
-    
+   
 class Algorithm2_SKLearn:
     """
     Algorithm2 adapted for sklearn-style models (DecisionTree, etc.)
