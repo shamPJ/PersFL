@@ -68,7 +68,6 @@ DATASETS = {
 ALGOS = {
     "Algorithm1": AlgoSpec(module="algos.Algorithm1", cls="Algorithm1", default_params={
         "lrate": 0.01,
-        "momentum": 0,
         "lrate_decay": None,
         "S": 30,
         "R": 1500,
@@ -88,7 +87,6 @@ ALGOS = {
     
     "FedAvg": AlgoSpec(module="algos.FedAvg", cls="FedAvg", default_params={
         "lrate": 0.01,
-        "momentum": 0.9,
         "lrate_decay": 0.999,
         "S": 10,
         "R": 500,

@@ -55,7 +55,6 @@ srun python scripts/main.py \
     --R 200 \
     --R_local 5 \
     --lrate 0.01 \
-    --momentum 0.9 \
     --lrate_decay 0.999 \
     --S 40 \
     --fname ${OUT_DIR}/Algorithm1/cnn_cifar10_iid_${SEED}.csv \
@@ -89,7 +88,6 @@ srun python scripts/main.py \
         --R 200 \
         --R_local 5 \
         --lrate 0.01 \
-        --momentum 0.9 \
         --lrate_decay 0.999 \
         --S 40 \
         --fname ${OUT_DIR}/FedAvg/cnn_cifar10_iid_${SEED}.csv \

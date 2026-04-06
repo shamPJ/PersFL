@@ -38,7 +38,6 @@ def read_options():
     parser.add_argument("--n_features", type=int, default=10)
     parser.add_argument("--lrate", type=float, default=0.1)
     parser.add_argument("--lmbd", type=float, default=1)
-    parser.add_argument("--momentum", type=float, default=0.0)
     parser.add_argument("--lrate_decay", type=float, default=None)
     parser.add_argument("--n_clients", type=int, default=100)
     parser.add_argument("--n_clusters", type=int, default=3)
