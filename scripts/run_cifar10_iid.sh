@@ -45,23 +45,23 @@ echo "========================================"
 # ===============================
 # Run experiment
 # ===============================
-# srun python scripts/main.py \
-#     --n_clients 20 \
-#     --n_clusters 1 \
-#     --n_classes 10 \
-#     --model cnn \
-#     --dataset cifar10 \
-#     --algo Algorithm1 \
-#     --R 500 \
-#     --R_local 5 \
-#     --lrate 0.01 \
-#     --momentum 0 \
-#     --lrate_decay 0.999 \
-#     --S 10 \
-#     --fname ${OUT_DIR}/Algorithm1/cnn_cifar10_iid_${SEED}.csv \
-#     --device cuda \
-#     --problem classification \
-#     --seed $SEED 
+srun python scripts/main.py \
+    --n_clients 200 \
+    --n_clusters 1 \
+    --n_classes 10 \
+    --model cnn \
+    --dataset cifar10 \
+    --algo Algorithm1 \
+    --R 200 \
+    --R_local 5 \
+    --lrate 0.01 \
+    --momentum 0.9 \
+    --lrate_decay 0.999 \
+    --S 40 \
+    --fname ${OUT_DIR}/Algorithm1/cnn_cifar10_iid_${SEED}.csv \
+    --device cuda \
+    --problem classification \
+    --seed $SEED 
     
 # srun python main.py \
 #     --n_clients 150 \
@@ -88,10 +88,10 @@ srun python scripts/main.py \
         --algo FedAvg \
         --R 200 \
         --R_local 5 \
-        --lrate 0.2 \
+        --lrate 0.01 \
         --momentum 0.9 \
         --lrate_decay 0.999 \
-        --S 50 \
+        --S 40 \
         --fname ${OUT_DIR}/FedAvg/cnn_cifar10_iid_${SEED}.csv \
         --device cuda \
         --problem classification \

@@ -264,7 +264,7 @@ class Algorithm1:
             candidate_model.load_state_dict(model.state_dict())
 
             data_size = X_candidates[i].shape[0]
-            batch_size = min(32, data_size)
+            batch_size = min(16, data_size)
 
             # reset velocity for this candidate if using momentum
             velocities_candidate = [torch.zeros_like(p) for p in candidate_model.parameters()]
@@ -287,7 +287,7 @@ class Algorithm1:
                     grads = torch.autograd.grad(loss, candidate_model.parameters(), create_graph=False)
 
                     with torch.no_grad():
-                        for j, (p, g) in enumerate(zip(model.parameters(), grads)):
+                        for j, (p, g) in enumerate(zip(candidate_model.parameters(), grads)):
                             if self.momentum > 0:
                                 velocities_candidate[j] = self.momentum * velocities_candidate[j] + g
                                 update = velocities_candidate[j]
@@ -297,6 +297,10 @@ class Algorithm1:
             
             updated_params = [p.clone() for p in candidate_model.parameters()]
             velocities.append(velocities_candidate)
+
+            # Explicitly delete and free GPU memory
+            del candidate_model
+            torch.cuda.empty_cache()
 
             # Store updated candidate weights as independent cloned state_dict
             candidate_params.append({
