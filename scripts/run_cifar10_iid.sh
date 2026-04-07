@@ -52,11 +52,11 @@ srun python scripts/main.py \
     --model cnn \
     --dataset cifar10 \
     --algo Algorithm1 \
-    --R 200 \
+    --R 10 \
     --R_local 5 \
     --lrate 0.01 \
     --lrate_decay 0.999 \
-    --S 40 \
+    --S 5 \
     --fname ${OUT_DIR}/Algorithm1/cnn_cifar10_iid_${SEED}.csv \
     --device cuda \
     --problem classification \

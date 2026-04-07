@@ -63,7 +63,7 @@ class Algorithm1:
 
         for _ in range(self.R_local):
             # Shuffle the dataset at the start of each epoch
-            perm = torch.randperm(data_size, device=self.device)
+            perm = torch.randperm(data_size, device=X.device)
             X_shuffled = X[perm]
             y_shuffled = y[perm]
 
