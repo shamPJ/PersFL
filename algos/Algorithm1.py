@@ -151,33 +151,21 @@ class Algorithm1:
                 candidate_indices.append(idx)
 
             # Step 2: compute candidate updates
-            all_candidate_params = []
-            for i in range(n_clients):
-                candidates_X = X_train[candidate_indices[i]]
-                candidates_y = y_train[candidate_indices[i]]
-                # candidate_params - list of dicts with params
-                candidate_params = self.weight_update(self.client_models[i], candidates_X, candidates_y)
-                all_candidate_params.append(candidate_params)
-
-            # Step 3: evaluate candidates and select best param. est. error list
             # initialize accumulators per metric
             metrics_sums = {name: torch.tensor(0.0, device=device) for name in self.metrics.keys()}
             for i in range(n_clients):
-                if len(all_candidate_params[i]) == 0:
-                    best_w = {k: v.clone() for k, v in self.client_models[i].state_dict().items()}
-                    best_idx = 0
-                    losses = torch.tensor(
-                        [self.loss_fn(self.client_models[i](X_train[i]), y_train[i])],
-                        device=device
-                    )
-                else:
-                    losses = self.candidate_losses(self.client_models[i], all_candidate_params[i], X_train[i], y_train[i])
-                    best_idx = torch.argmin(losses)
-                    best_w = all_candidate_params[i][best_idx]  # stored on CPU
-                    # update client model with best candidate params
-                    self.client_models[i].load_state_dict({k: v.to(self.device) for k, v in best_w.items()})
+                candidates_X = [X_train[j] for j in candidate_indices[i]]
+                candidates_y = [y_train[j] for j in candidate_indices[i]]
+                # candidate_params - list of dicts with params
+                best_loss, best_params = self.weight_update(self.client_models[i], 
+                                                      candidates_X, 
+                                                      candidates_y,
+                                                      X_train[i],
+                                                      y_train[i]
+                                                      )
 
-                self.loss_history[i, r] = losses[best_idx].detach().cpu().item()
+                self.loss_history[i, r] = best_loss.detach().cpu().item()
+                self.client_models[i].load_state_dict({k: v.to(self.device) for k, v in best_params.items()})
 
                 # -----------------------------
                 # Evaluate metrics for this iteration
@@ -187,15 +175,19 @@ class Algorithm1:
                     if metric_name == "MSE_params":
                         # only for linear models
                         cluster_id = cluster_labels[i]
-                        param_tensor = list(best_w.values())[0]
+                        param_tensor = list(best_params.values())[0]
                         if true_weights is None or cluster_labels is None:
                             raise ValueError("MSE_params requires both true_weights and cluster_labels")
                         # out is scalar tensor
                         metric_value = metric_fn(torch.squeeze(param_tensor), true_weights[cluster_id])
                     else:
                         if val_predictions is None:
-                            val_predictions = self.get_predictions(self.client_models[i], X_val[i])
-                        metric_value = metric_fn(val_predictions, y_val[i])
+                            X_val_i = X_val[i].to(device)
+                            y_val_i = y_val[i].to(device)
+                            val_predictions = self.get_predictions(self.client_models[i], X_val_i)
+
+                        metric_value = metric_fn(val_predictions, y_val_i)
+                        del X_val_i, y_val_i
                     
                     metrics_sums[metric_name] += metric_value.detach()
 
@@ -207,7 +199,7 @@ class Algorithm1:
     # --------------------------------
     # Helper methods
     # --------------------------------
-    def weight_update(self, model, X_candidates, y_candidates):
+    def weight_update(self, model, X_candidates, y_candidates, X_train_i, y_train_i):
         """
         Compute candidate updates for one client using functional gradient steps.
 
@@ -217,30 +209,32 @@ class Algorithm1:
             y_candidates: Tensor[S, m_i, ...] - labels for candidate neighbors
 
         Returns:
-            candidate_params: list of S dicts with cloned parameter tensors
+            
         """
         device = self.device
-        S = X_candidates.shape[0]
-        candidate_params = []
+        # move local data to gpu
+        X_train_i = X_train_i.to(device)
+        y_train_i = y_train_i.to(device)
 
-        # --- 1. Store base model parameters as clones ---
-        base_params = [p.clone() for p in model.parameters()]
-        param_names = [name for name, _ in model.named_parameters()]
+        S = len(X_candidates)
 
         # Ensure model does not modify running stats for candidates
         model.eval()  # freeze batchnorm/dropout stats
+        candidate_model = self.model_fn().to(device) # reuse model for memory save
+
+        best_loss = torch.tensor(float("inf"), device=device)
+        best_params = None
 
         for i in range(S):
-            # create a fresh copy of the model for candidate i
-            candidate_model = self.model_fn().to(device)
+            # start from clients' model / params
             candidate_model.load_state_dict(model.state_dict())
 
             data_size = X_candidates[i].shape[0]
             batch_size = min(16, data_size)
-
+            # train on candidates data
             for r in range(self.R_local):
                 # Shuffle the dataset at the start of each epoch
-                perm = torch.randperm(data_size, device=self.device)
+                perm = torch.randperm(data_size, device=X_candidates[i].device)
                 X_shuffled = X_candidates[i][perm]
                 y_shuffled = y_candidates[i][perm]
 
@@ -268,48 +262,19 @@ class Algorithm1:
                     # cleanup
                     del X_batch, y_batch, pred, loss, grads
             
-            # updated_params = [p.clone() for p in candidate_model.parameters()]
-            # velocities.append(velocities_candidate)
-
-            # save updated parameters on CPU
-            updated_params = [p.clone().cpu() for p in candidate_model.parameters()]
-            candidate_params.append({name: p for name, p in zip(param_names, updated_params)})
-
-            # Explicitly delete and free GPU memory
-            del candidate_model
-
-            # Store updated candidate weights as independent cloned state_dict
-            # candidate_params.append({
-            #     name: p.clone()
-            #     for name, p in zip(param_names, updated_params)
-            # })
-
-        # Restore model to original parameters
-        for p, bp in zip(model.parameters(), base_params):
-            p.data.copy_(bp)
+            # eval trained model on client's local data
+            with torch.no_grad():
+                pred = candidate_model(X_train_i)
+                loss = self.loss_fn(pred, y_train_i)
+            
+            # keep only smallest loss
+            if loss < best_loss:
+                best_loss = loss
+                best_params = {k: v.clone().cpu() for k, v in candidate_model.state_dict().items()}
 
         # Return model to train mode if needed for evaluation later
         model.train()
 
-        return candidate_params
+        del candidate_model
 
-    def candidate_losses(self, client_model, candidate_params, X_client, y_client):
-        """Evaluate candidates on a single client"""
-        device = self.device
-        S = len(candidate_params)
-        losses = torch.zeros(S, device=device)
-
-        X_client = X_client.to(device)
-        y_client = y_client.to(device)
-
-        # save client's current params to restore later
-        base_state = {k: v.clone() for k, v in client_model.state_dict().items()}
-
-        for i, params in enumerate(candidate_params):
-            client_model.load_state_dict({k: v.to(device) for k, v in params.items()})
-            client_model.eval()
-            with torch.no_grad():
-                pred = client_model(X_client)
-                losses[i] = self.loss_fn(pred, y_client)
-        client_model.load_state_dict(base_state)
-        return losses
+        return best_loss, best_params
