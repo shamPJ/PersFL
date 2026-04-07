@@ -46,14 +46,14 @@ echo "========================================"
 # Run experiment
 # ===============================
 srun python scripts/main.py \
-    --n_clients 200 \
+    --n_clients 10 \
     --n_clusters 1 \
     --n_classes 10 \
     --model cnn \
     --dataset cifar10 \
     --algo Algorithm1 \
-    --R 10 \
-    --R_local 5 \
+    --R 30 \
+    --R_local 10 \
     --lrate 0.01 \
     --lrate_decay 0.999 \
     --S 5 \

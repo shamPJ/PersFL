@@ -119,7 +119,7 @@ class Algorithm1:
             model = self.model_fn().to(device)
             self.client_models.append(model)
 
-        self.loss_history = torch.zeros((n_clients, self.R), device=device)
+        self.loss_history = torch.zeros((n_clients, self.R))
 
         if cluster_labels is not None:
             cluster_labels = torch.tensor(cluster_labels, device=device)
