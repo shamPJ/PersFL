@@ -70,7 +70,37 @@ echo "Starting experiments at $(date)"
 #             --problem regression \
 #             --seed $SEED
 
-PARAM_LIST=(0.05 0.1 0.2 0.5) # lmbd
+#PARAM_LIST=(0.05 0.1 0.2 0.5) # lmbd
+## ===============================
+## Index mapping
+## ===============================
+#IDX=$SLURM_ARRAY_TASK_ID
+#
+#NP=${#PARAM_LIST[@]} # number of elements in the array
+#NS=${#SEEDS[@]}
+#
+#PARAM_IDX=$(( IDX / NS ))
+#SEED_IDX=$(( IDX %  NS ))
+#
+#PARAM=${PARAM_LIST[$PARAM_IDX]}
+#SEED=${SEEDS[$SEED_IDX]}
+
+#srun python scripts/main.py \
+#            --n_clients 150 \
+#            --n_clusters 3 \
+#            --n_features 10 \
+#            --model decision_tree \
+#            --lmbd $PARAM \
+#            --dataset synthetic \
+#            --algo Algorithm2_SKLearn \
+#            --R 200 \
+#            --S 30 \
+#            --fname ${OUT_DIR}/linear_syn_lmbd/Algorithm2_SKLearn/dt_synthetic_${PARAM}_${SEED}.csv \
+#            --device cpu \
+#            --problem regression \
+#            --seed $SEED
+
+PARAM_LIST=(10 20 30 50) # S
 # ===============================
 # Index mapping
 # ===============================
@@ -90,12 +120,12 @@ srun python scripts/main.py \
             --n_clusters 3 \
             --n_features 10 \
             --model decision_tree \
-            --lmbd $PARAM \
+            --lmbd 0.05 \
             --dataset synthetic \
             --algo Algorithm2_SKLearn \
             --R 200 \
-            --S 30 \
-            --fname ${OUT_DIR}/linear_syn_lmbd/Algorithm2_SKLearn/dt_synthetic_${PARAM}_${SEED}.csv \
+            --S $PARAM \
+            --fname ${OUT_DIR}/linear_syn_S/Algorithm2_SKLearn/dt_synthetic_${PARAM}_${SEED}.csv \
             --device cpu \
             --problem regression \
             --seed $SEED
