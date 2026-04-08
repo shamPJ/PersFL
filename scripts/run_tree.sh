@@ -15,7 +15,7 @@ set -euo pipefail
 module load mamba
 source activate pytorch-env
 
-export PYTHONPATH="$PYTHONPATH:$PWD"
+export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$PWD"
 export OMP_NUM_THREADS=1
 
 SEEDS=(0 1 2 3 4 5 6 7 8 9)
