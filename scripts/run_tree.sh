@@ -41,7 +41,7 @@ done
 # ===============================
 # Choose experiment (must match EXPS)
 # ===============================
-exp="linear_syn_noise"
+exp="linear_syn_noise_w"
 
 # ===============================
 # Parameter selection

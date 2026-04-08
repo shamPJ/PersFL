@@ -79,7 +79,7 @@ class Algorithm1:
                 grads = torch.autograd.grad(loss, model.parameters(), create_graph=False)
 
                 with torch.no_grad():
-                    for i, (p, g) in enumerate(zip(model.parameters(), grads)):
+                    for p, g in zip(model.parameters(), grads):
                         p -= self.lrate * g
     
     # --------------------------------
@@ -156,13 +156,13 @@ class Algorithm1:
             for i in range(n_clients):
                 candidates_X = [X_train[j] for j in candidate_indices[i]]
                 candidates_y = [y_train[j] for j in candidate_indices[i]]
-                # candidate_params - list of dicts with params
+                
                 best_loss, best_params = self.weight_update(self.client_models[i], 
-                                                      candidates_X, 
-                                                      candidates_y,
-                                                      X_train[i],
-                                                      y_train[i]
-                                                      )
+                                                            candidates_X, 
+                                                            candidates_y,
+                                                            X_train[i],
+                                                            y_train[i]
+                                                            )
 
                 self.loss_history[i, r] = best_loss.detach().cpu().item()
                 self.client_models[i].load_state_dict({k: v.to(self.device) for k, v in best_params.items()})
@@ -187,9 +187,10 @@ class Algorithm1:
                             val_predictions = self.get_predictions(self.client_models[i], X_val_i)
 
                         metric_value = metric_fn(val_predictions, y_val_i)
-                        del X_val_i, y_val_i
-                    
+
                     metrics_sums[metric_name] += metric_value.detach()
+
+                del X_val_i, y_val_i, val_predictions
 
             for metric_name in self.metrics.keys():
                 self.metrics_history[metric_name][r] = metrics_sums[metric_name] / n_clients
@@ -221,18 +222,19 @@ class Algorithm1:
         # Ensure model does not modify running stats for candidates
         model.eval()  # freeze batchnorm/dropout stats
         candidate_model = self.model_fn().to(device) # reuse model for memory save
-
+        
         best_loss = torch.tensor(float("inf"), device=device)
         best_params = None
 
         for i in range(S):
             # start from clients' model / params
             candidate_model.load_state_dict(model.state_dict())
+            candidate_model.train()
 
             data_size = X_candidates[i].shape[0]
             batch_size = min(16, data_size)
             # train on candidates data
-            for r in range(self.R_local):
+            for _ in range(self.R_local):
                 # Shuffle the dataset at the start of each epoch
                 perm = torch.randperm(data_size, device=X_candidates[i].device)
                 X_shuffled = X_candidates[i][perm]
@@ -256,7 +258,7 @@ class Algorithm1:
                     grads = torch.autograd.grad(loss, candidate_model.parameters(), create_graph=False)
 
                     with torch.no_grad():
-                        for j, (p, g) in enumerate(zip(candidate_model.parameters(), grads)):
+                        for p, g in zip(candidate_model.parameters(), grads):
                             p -= self.lrate * g
                     
                     # cleanup
@@ -271,9 +273,6 @@ class Algorithm1:
             if loss < best_loss:
                 best_loss = loss
                 best_params = {k: v.clone().cpu() for k, v in candidate_model.state_dict().items()}
-
-        # Return model to train mode if needed for evaluation later
-        model.train()
 
         del candidate_model
 

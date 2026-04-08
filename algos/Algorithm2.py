@@ -6,7 +6,8 @@ import torch.nn.functional as F
 from utils.metrics import MSE, MSE_params, accuracy, F1
 
 class Algorithm2:
-    def __init__(self, model_fn, loss_fn, metrics={"MSE_val": MSE}, R=50, R_local=0, S=20, lrate=0.01, lmbd=1, device='cpu', seed=None):
+    def __init__(self, model_fn, loss_fn, metrics={"MSE_val": MSE}, R=50, R_local=0, S=20, 
+                 lrate=0.01, lrate_decay=None, lmbd=1, device='cpu', seed=None):
         """
         Algorithm2
 
@@ -27,6 +28,7 @@ class Algorithm2:
         self.S = S
         self.lrate_init = lrate
         self.lrate = lrate
+        self.lrate_decay = lrate_decay
         self.lmbd = lmbd
         self.device = device
         self.seed = seed
@@ -106,18 +108,21 @@ class Algorithm2:
         device = self.device
         n_clients = X_train.shape[0]
 
-        X_train = X_train.cpu()
-        y_train = y_train.cpu()
-        X_val = X_val.cpu()
-        y_val = y_val.cpu()
-
         if len(X_train.shape) == 3:
-            X_test = torch.randn((100, X_train.shape[2]), device='cpu') # fixed test set for regularization
+            X_pub = torch.randn((100, X_train.shape[2])) # fixed test set for regularization
         elif len(X_train.shape) == 5:
             mean = torch.tensor([0.4914, 0.4822, 0.4465]).view(1,3,1,1)
             std = torch.tensor([0.2023, 0.1994, 0.2010]).view(1,3,1,1)
 
-            X_test = torch.randn((1000,3,32,32), device='cpu') * std + mean
+            X_pub = torch.randn((1000,3,32,32)) * std + mean
+
+        X_train = X_train.cpu()
+        y_train = y_train.cpu()
+
+        X_val = X_val.cpu()
+        y_val = y_val.cpu()
+
+        X_pub = X_pub.to(device) # keep on GPU
 
         # Initialize client models
         self.client_models = []
@@ -167,7 +172,7 @@ class Algorithm2:
                                             candidates_y,
                                             X_train[i],
                                             y_train[i],
-                                            X_test  
+                                            X_pub 
                                         )
                     
                 self.loss_history[i, r] = best_loss.detach().cpu().item()
@@ -193,9 +198,10 @@ class Algorithm2:
                             val_predictions = self.get_predictions(self.client_models[i], X_val_i)
 
                         metric_value = metric_fn(val_predictions, y_val_i)
-                        del X_val_i, y_val_i
                     
                     metrics_sums[metric_name] += metric_value.detach()
+
+                del X_val_i, y_val_i, val_predictions
 
             for metric_name in self.metrics.keys():
                 self.metrics_history[metric_name][r] = metrics_sums[metric_name] / n_clients
@@ -225,50 +231,67 @@ class Algorithm2:
 
         S = len(X_candidates)
 
+        if len(X_train_i.shape) == 2:
+            task = "regression"
+        elif len(X_train_i.shape) == 4:
+             task = "classification"
+
         # Ensure model does not modify running stats for candidates
         model.eval()  # freeze batchnorm/dropout stats
-        with torch.no_grad():
-            base_preds = model(X_pub.to(device))
-
+        batch_size=32
+        N_pub = len(X_pub)
+                    
         candidate_model = self.model_fn().to(device) # reuse model for memory save
 
         best_loss = torch.tensor(float("inf"), device=device)
         best_params = None
-        
-        if len(X_train_i.shape) == 3:
-            task = "regression"
-        elif len(X_train_i.shape) == 5:
-             task = "classification"
 
         for i in range(S):
             # start from clients' model / params
             candidate_model.load_state_dict(model.state_dict())
             candidate_model.train()
 
+            X_c = X_candidates[i].to(device)
+            y_c = y_candidates[i].to(device)
+
             # Simple inner training loop
-            for _ in range(1):
-                pred = candidate_model(X_candidates[i])
-                loss_data = self.loss_fn(pred, y_candidates[i])
+            for _ in range(self.R_local):
+                perm = torch.randperm(len(X_c), device=device)
 
-                # Prediction regularization
-                pred_pub = candidate_model(X_pub.to(device))
-                if task == 'regression':
-                    loss_reg = torch.mean((pred_pub - base_preds) ** 2)
-                elif task == 'classification':
-                    p_teacher = F.softmax(base_preds / T, dim=1)
-                    p_student = F.log_softmax(pred_pub / T, dim=1)
-                    loss_reg = F.kl_div(p_student, p_teacher, reduction='batchmean') * (T**2)
+                for start in range(0, len(X_c), batch_size):
+                    idx = perm[start:start+batch_size]
+                    X_batch = X_c[idx]
+                    y_batch = y_c[idx]
 
-                loss = self.lmbd * loss_data + loss_reg
-                loss.backward()
+                    pred = candidate_model(X_batch)
+                    loss_data = self.loss_fn(pred, y_batch)
 
-                with torch.no_grad():
-                    for p in candidate_model.parameters():
-                        p -= self.lrate * p.grad
-                        p.grad = None
-                
-                # cleanup
-                del pred, loss
+                    # choose batch from public dataset randomly
+                    pub_idx = torch.randint(0, N_pub, (batch_size,), device=device)
+                    X_pub_batch = X_pub[pub_idx]
+                    with torch.no_grad():
+                        base_preds_batch = model(X_pub_batch)
+
+                    # Prediction regularization
+                    pred_pub = candidate_model(X_pub_batch)
+                    if task == 'regression':
+                        loss_reg = torch.mean((pred_pub - base_preds_batch) ** 2)
+                    elif task == 'classification':
+                        p_teacher = F.softmax(base_preds_batch / T, dim=1)
+                        p_student = F.log_softmax(pred_pub / T, dim=1)
+                        loss_reg = F.kl_div(p_student, p_teacher, reduction='batchmean') * (T**2)
+
+                    loss = self.lmbd * loss_data + loss_reg
+
+                    grads = torch.autograd.grad(loss, candidate_model.parameters(), create_graph=False)
+
+                    with torch.no_grad():
+                        for p, g in zip(candidate_model.parameters(), grads):
+                            p -= self.lrate * g
+                    
+                    # cleanup
+                    del loss, loss_data, loss_reg, pred_pub, base_preds_batch
+                    del X_batch, y_batch, pred, grads
 
             # eval trained model on client's local data
             with torch.no_grad():
@@ -279,9 +302,6 @@ class Algorithm2:
             if loss < best_loss:
                 best_loss = loss
                 best_params = {k: v.clone().cpu() for k, v in candidate_model.state_dict().items()}
-
-        # Return model to train mode if needed for evaluation later
-        model.train()
 
         del candidate_model
 
