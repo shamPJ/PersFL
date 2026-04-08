@@ -2,6 +2,7 @@ import torch
 import numpy as np
 import random
 from torch import nn
+import torch.nn.functional as F
 from utils.metrics import MSE, MSE_params, accuracy, F1
 
 class Algorithm2:
@@ -24,6 +25,7 @@ class Algorithm2:
         self.R = R
         self.R_local = R_local
         self.S = S
+        self.lrate_init = lrate
         self.lrate = lrate
         self.lmbd = lmbd
         self.device = device
@@ -52,16 +54,32 @@ class Algorithm2:
         return out
     
     def local_train(self, model, X, y):
+
         model.train()
+
+        data_size = X.shape[0]
+        batch_size = min(32, data_size)
+
         for _ in range(self.R_local):
-            pred = model(X)
-            loss = self.loss_fn(pred.squeeze(), y.squeeze())
-            
-            loss.backward()
-            with torch.no_grad():
-                for p in model.parameters():
-                    p -= self.lrate * p.grad
-                    p.grad = None
+            # Shuffle the dataset at the start of each epoch
+            perm = torch.randperm(data_size, device=X.device)
+            X_shuffled = X[perm]
+            y_shuffled = y[perm]
+
+            # Iterate over minibatches
+            for start in range(0, data_size, batch_size):
+                end = start + batch_size
+                X_batch = X_shuffled[start:end].to(self.device, non_blocking=True)
+                y_batch = y_shuffled[start:end].to(self.device, non_blocking=True)
+
+                pred = model(X_batch)
+                loss = self.loss_fn(pred, y_batch)
+
+                grads = torch.autograd.grad(loss, model.parameters(), create_graph=False)
+
+                with torch.no_grad():
+                    for i, (p, g) in enumerate(zip(model.parameters(), grads)):
+                        p -= self.lrate * g
     
     # --------------------------------
     # Run method: 
@@ -86,13 +104,20 @@ class Algorithm2:
         true_weights = data.get("true_weights", None)
 
         device = self.device
-        n_clients, _, d = X_train.shape
+        n_clients = X_train.shape[0]
 
-        X_train = torch.as_tensor(X_train, dtype=torch.float32, device=device)
-        y_train = torch.tensor(y_train, dtype=torch.float32, device=device)
-        X_val = torch.as_tensor(X_val, dtype=torch.float32, device=device)
-        y_val = torch.tensor(y_val, dtype=torch.float32, device=device)
-        X_test = torch.randn((100, d), device=device) # fixed test set for regularization
+        X_train = X_train.cpu()
+        y_train = y_train.cpu()
+        X_val = X_val.cpu()
+        y_val = y_val.cpu()
+
+        if len(X_train.shape) == 3:
+            X_test = torch.randn((100, X_train.shape[2]), device='cpu') # fixed test set for regularization
+        elif len(X_train.shape) == 5:
+            mean = torch.tensor([0.4914, 0.4822, 0.4465]).view(1,3,1,1)
+            std = torch.tensor([0.2023, 0.1994, 0.2010]).view(1,3,1,1)
+
+            X_test = torch.randn((1000,3,32,32), device='cpu') * std + mean
 
         # Initialize client models
         self.client_models = []
@@ -100,7 +125,7 @@ class Algorithm2:
             model = self.model_fn().to(device)
             self.client_models.append(model)
 
-        self.loss_history = torch.zeros((n_clients, self.R), device=device)
+        self.loss_history = np.zeros((n_clients, self.R))
 
         if cluster_labels is not None:
             cluster_labels = torch.tensor(cluster_labels, device=device)
@@ -109,6 +134,10 @@ class Algorithm2:
 
         # Main iteration loop
         for r in range(self.R):
+            # lrate decay if specified
+            if self.lrate_decay is not None:
+                self.lrate = self.lrate_init * (self.lrate_decay ** r)
+
             # --- local updates ---
             for i in range(n_clients):
                 self.local_train(
@@ -116,6 +145,7 @@ class Algorithm2:
                     X_train[i],
                     y_train[i]
                 )
+
             # Step 1: sample candidate neighbors (exclude self)
             candidate_indices = []
             for i in range(n_clients):
@@ -127,36 +157,21 @@ class Algorithm2:
                 candidate_indices.append(idx)
 
             # Step 2: compute candidate updates
-            all_candidate_models = []
-            for i in range(n_clients):
-                candidates_X = X_train[candidate_indices[i]]
-                candidates_y = y_train[candidate_indices[i]]
-                # candidate_params - list of dicts with params
-                candidate_models = self.hypothesis_update(
-                                self.client_models[i],
-                                candidates_X,
-                                candidates_y,
-                                X_test   # acts as test set
-                            )
-                all_candidate_models.append(candidate_models)
-
-            # Step 3: evaluate candidates and select best param. est. error list
-            # initialize accumulators per metric
             metrics_sums = {name: torch.tensor(0.0, device=device) for name in self.metrics.keys()}
             for i in range(n_clients):
-                losses = []
-                for candidate_model in all_candidate_models[i]:
-                    candidate_model.eval()
-                    with torch.no_grad():
-                        pred = candidate_model(X_train[i])
-                        loss = self.loss_fn(pred.squeeze(), y_train[i].squeeze())
-                    losses.append(loss)
+                candidates_X = [X_train[j] for j in candidate_indices[i]]
+                candidates_y = [y_train[j] for j in candidate_indices[i]]
 
-                losses = torch.stack(losses)
-                best_idx = torch.argmin(losses)
-
-                self.client_models[i] = all_candidate_models[i][best_idx]
-                self.loss_history[i, r] = losses[best_idx].detach().cpu().numpy()
+                best_loss, best_params = self.hypothesis_update(self.client_models[i],
+                                            candidates_X,
+                                            candidates_y,
+                                            X_train[i],
+                                            y_train[i],
+                                            X_test  
+                                        )
+                    
+                self.loss_history[i, r] = best_loss.detach().cpu().item()
+                self.client_models[i].load_state_dict({k: v.to(self.device) for k, v in best_params.items()})
 
                 # -----------------------------
                 # Evaluate metrics for this iteration
@@ -164,18 +179,21 @@ class Algorithm2:
                 val_predictions = None # cache val predictions if needed for multiple metrics
                 for metric_name, metric_fn in self.metrics.items():
                     if metric_name == "MSE_params":
-                        best_w = self.client_models[i].state_dict()
                         # only for linear models
                         cluster_id = cluster_labels[i]
-                        param_tensor = list(best_w.values())[0]
+                        param_tensor = list(best_params.values())[0]
                         if true_weights is None or cluster_labels is None:
                             raise ValueError("MSE_params requires both true_weights and cluster_labels")
                         # out is scalar tensor
                         metric_value = metric_fn(torch.squeeze(param_tensor), true_weights[cluster_id])
                     else:
                         if val_predictions is None:
-                            val_predictions = self.get_predictions(self.client_models[i], X_val[i])
-                        metric_value = metric_fn(val_predictions, y_val[i])
+                            X_val_i = X_val[i].to(device)
+                            y_val_i = y_val[i].to(device)
+                            val_predictions = self.get_predictions(self.client_models[i], X_val_i)
+
+                        metric_value = metric_fn(val_predictions, y_val_i)
+                        del X_val_i, y_val_i
                     
                     metrics_sums[metric_name] += metric_value.detach()
 
@@ -187,7 +205,7 @@ class Algorithm2:
     # --------------------------------
     # Helper methods
     # --------------------------------
-    def hypothesis_update(self, model, X_candidates, y_candidates, X_test):
+    def hypothesis_update(self, model, X_candidates, y_candidates, X_train_i, y_train_i, X_pub, T=1):
         """
         Model-agnostic update via regularized re-training.
 
@@ -195,40 +213,76 @@ class Algorithm2:
             model: current client model (ĥ)
             X_candidates: Tensor [S, ...]
             y_candidates: Tensor [S, ...]
-            X_test: Tensor for prediction regularization
+            X_pub: Tensor for prediction regularization
 
         Returns:
             candidate_models: list of updated model instances
         """
-        S = X_candidates.shape[0]
-        candidate_models = []
+        device = self.device
+        # move local data to gpu
+        X_train_i = X_train_i.to(device)
+        y_train_i = y_train_i.to(device)
 
-        # Cache current model predictions on test set
-        base_preds = self.get_predictions(model, X_test).detach()
+        S = len(X_candidates)
 
-        base_state = {k: v.clone() for k, v in model.state_dict().items()}
+        # Ensure model does not modify running stats for candidates
+        model.eval()  # freeze batchnorm/dropout stats
+        with torch.no_grad():
+            base_preds = model(X_pub.to(device))
+
+        candidate_model = self.model_fn().to(device) # reuse model for memory save
+
+        best_loss = torch.tensor(float("inf"), device=device)
+        best_params = None
+        
+        if len(X_train_i.shape) == 3:
+            task = "regression"
+        elif len(X_train_i.shape) == 5:
+             task = "classification"
+
         for i in range(S):
-            new_model = self.model_fn().to(self.device)
-            new_model.load_state_dict(base_state)
-            new_model.train()
+            # start from clients' model / params
+            candidate_model.load_state_dict(model.state_dict())
+            candidate_model.train()
 
             # Simple inner training loop
             for _ in range(1):
-                pred = new_model(X_candidates[i])
-                loss_data = self.loss_fn(pred.squeeze(), y_candidates[i].squeeze())
+                pred = candidate_model(X_candidates[i])
+                loss_data = self.loss_fn(pred, y_candidates[i])
 
                 # Prediction regularization
-                pred_test = new_model(X_test)
-                loss_reg = torch.mean((pred_test - base_preds) ** 2)
+                pred_pub = candidate_model(X_pub.to(device))
+                if task == 'regression':
+                    loss_reg = torch.mean((pred_pub - base_preds) ** 2)
+                elif task == 'classification':
+                    p_teacher = F.softmax(base_preds / T, dim=1)
+                    p_student = F.log_softmax(pred_pub / T, dim=1)
+                    loss_reg = F.kl_div(p_student, p_teacher, reduction='batchmean') * (T**2)
 
                 loss = self.lmbd * loss_data + loss_reg
                 loss.backward()
 
                 with torch.no_grad():
-                    for p in new_model.parameters():
+                    for p in candidate_model.parameters():
                         p -= self.lrate * p.grad
                         p.grad = None
+                
+                # cleanup
+                del pred, loss
 
-            candidate_models.append(new_model)
+            # eval trained model on client's local data
+            with torch.no_grad():
+                pred = candidate_model(X_train_i)
+                loss = self.loss_fn(pred, y_train_i)
+            
+            # keep only smallest loss
+            if loss < best_loss:
+                best_loss = loss
+                best_params = {k: v.clone().cpu() for k, v in candidate_model.state_dict().items()}
 
-        return candidate_models
+        # Return model to train mode if needed for evaluation later
+        model.train()
+
+        del candidate_model
+
+        return best_loss, best_params
