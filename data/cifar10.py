@@ -40,8 +40,12 @@ def generate_clustered_cifar10(
             "cluster_classes": list of classes per cluster
     """
     rng = np.random.default_rng(seed)
-    X, y = load_cifar10()
-    y = np.array(y)
+    
+    (X_train_full, y_train_full), (X_test_full, y_test_full) = load_cifar10()
+
+    y_train_full = np.array(y_train_full)
+    y_test_full  = np.array(y_test_full)
+
     n_classes_total = 10
 
     # Assign classes to clusters (allow overlap)
@@ -56,8 +60,10 @@ def generate_clustered_cifar10(
     # Assign clients to clusters
     clients_per_cluster = n_clients // n_clusters
     cluster_labels = [] # e.g. [2 0 1 0 1 1 2 0 1 2] for n_clusters=3, n_clients=10
+
     for cluster_id in range(n_clusters):
         cluster_labels += [cluster_id] * clients_per_cluster # e.g. [0, 0, 0, 1, 1, 1, 2, 2, 2]
+
     # add remaining clients to random clusters if n_clients not divisible by n_clusters
     # e.g. [0, 0, 0, 1, 1, 1, 2, 2, 2, 1] to ensure approx. equal distribution of clients across clusters
     cluster_labels += rng.choice(n_clusters, n_clients - len(cluster_labels)).tolist() 
@@ -65,8 +71,16 @@ def generate_clustered_cifar10(
     rng.shuffle(cluster_labels)
 
     # Prepare per-class indices
-    indices_by_class = {c: np.where(y == c)[0].tolist() for c in range(n_classes_total)}
-    for idxs in indices_by_class.values():
+    train_indices_by_class = {
+        c: np.where(y_train_full == c)[0].tolist() for c in range(n_classes_total)
+    }
+    test_indices_by_class = {
+        c: np.where(y_test_full == c)[0].tolist() for c in range(n_classes_total)
+    }
+   
+    for idxs in train_indices_by_class.values():
+        rng.shuffle(idxs)
+    for idxs in test_indices_by_class.values():
         rng.shuffle(idxs)
 
     # Allocate train/val per client
@@ -75,38 +89,52 @@ def generate_clustered_cifar10(
     X_val = torch.zeros((n_clients, n_samples_val, *X.shape[1:]), dtype=torch.float32)
     y_val = torch.zeros((n_clients, n_samples_val), dtype=torch.long)
 
-    samples_per_class = (n_samples + n_samples_val) // n_classes # to sample approximately equal number of examples per class for each client
+    samples_per_class_train = max(1, n_samples // n_classes) # to sample approximately equal number of examples per class for each client
+    samples_per_class_val   = max(1, n_samples_val // n_classes)
+
     for i, cluster_id in enumerate(cluster_labels):
         # for ech client, get its cluster's classes and sample from them
         classes = cluster_classes[cluster_id]
-        # e.g. {4:0, 0:1, 5:2, 6:3} to remap original labels to 0,...,n_classes-1
-        # for CE loss 
-        label_map = {orig: new for new, orig in enumerate(classes)} 
-        client_indices = []
 
-        # Collect samples from cluster's classes
+         # ---- TRAIN ----
+        train_idxs = []
         for c in classes:
-            idxs_c = indices_by_class[c]
-            take = min(len(idxs_c[:samples_per_class]), n_samples + n_samples_val - len(client_indices))
-            client_indices += idxs_c[:take]
-            indices_by_class[c] = idxs_c[take:] # remove taken indices
+            pool = train_indices_by_class[c]
+            take = min(len(pool), samples_per_class_train)
+            train_idxs += pool[:take]
+            train_indices_by_class[c] = pool[take:]
 
-        rng.shuffle(client_indices)
-        # If not enough samples, sample with replacement from cluster's classes
-        all_class_indices = {c: np.where(y == c)[0].tolist() for c in classes}
-        while len(client_indices) < n_samples + n_samples_val:
+        # fallback if needed
+        while len(train_idxs) < n_samples:
             c = rng.choice(classes)
-            # remove already taken indices to avoid duplicates            
-            available = list(set(all_class_indices[c]) - set(client_indices))
-            client_indices.append(rng.choice(available))
+            pool = np.where(y_train_full == c)[0]
+            train_idxs.append(rng.choice(pool))
 
-        train_idxs = client_indices[:n_samples]
-        val_idxs = client_indices[n_samples:n_samples + n_samples_val]
+        rng.shuffle(train_idxs)
+        train_idxs = train_idxs[:n_samples]
 
-        X_train[i] = X[train_idxs]
-        y_train[i] = torch.tensor(y[train_idxs])
-        X_val[i] = X[val_idxs]
-        y_val[i] = torch.tensor(y[val_idxs])
+        # ---- VALIDATION ----
+        val_idxs = []
+        for c in classes:
+            pool = test_indices_by_class[c]
+            take = min(len(pool), samples_per_class_val)
+            val_idxs += pool[:take]
+            test_indices_by_class[c] = pool[take:]
+
+        # fallback if needed
+        while len(val_idxs) < n_samples_val:
+            c = rng.choice(classes)
+            pool = np.where(y_test_full == c)[0]
+            val_idxs.append(rng.choice(pool))
+
+        rng.shuffle(val_idxs)
+        val_idxs = val_idxs[:n_samples_val]
+
+        X_train[i] = X_train_full[train_idxs]
+        y_train[i] = torch.tensor(y_train_full[train_idxs])
+
+        X_val[i] = X_test_full[val_idxs]
+        y_val[i] = torch.tensor(y_test_full[val_idxs])
 
     return {
         "train": (X_train, y_train),
@@ -115,7 +143,7 @@ def generate_clustered_cifar10(
         "cluster_classes": cluster_classes
     }   
 
-def generate_rotated_cifar10(n_clusters=4, n_clients=100, seed=0):
+def generate_rotated_cifar10(n_clusters=4, n_clients=100, n_samples=500, n_samples_val=1000, seed=0):
     """
     Generate rotated CIFAR dataset partitioned into clusters by rotation.
 
@@ -153,8 +181,8 @@ def generate_rotated_cifar10(n_clusters=4, n_clients=100, seed=0):
     # Calculate samples per client
     n_clients_per_cluster = n_clients // n_clusters
     
-    n_samples_per_client = X_base_train.shape[0] // n_clients_per_cluster
-    n_samples_val_per_client = X_base_test.shape[0] // n_clients_per_cluster
+    n_samples_per_client = min(X_base_train.shape[0] // n_clients_per_cluster, n_samples)
+    n_samples_val_per_client = min(X_base_test.shape[0] // n_clients_per_cluster, n_samples_val)
     print(n_clients_per_cluster, n_samples_per_client, n_samples_val_per_client)
 
     X_train = torch.zeros((n_clients, n_samples_per_client, *X_base_train.shape[1:]))
