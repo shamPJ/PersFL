@@ -49,10 +49,12 @@ srun python scripts/main.py \
     --n_clients 10 \
     --n_clusters 2 \
     --n_classes 10 \
+    --n_samples 500 \
+    --n_samples_val 1000 \
     --model cnn \
     --dataset cifar10 \
     --algo Algorithm1 \
-    --R 30 \
+    --R 50 \
     --R_local 5 \
     --lrate 0.01 \
     --lrate_decay 0.9 \
@@ -82,10 +84,12 @@ srun python scripts/main.py \
         --n_clients 10 \
         --n_clusters 2 \
         --n_classes 10 \
-	    --model cnn \
+	--n_samples 500 \
+    	--n_samples_val 1000 \
+	--model cnn \
         --dataset cifar10 \
         --algo FedAvg \
-        --R 30 \
+        --R 50 \
         --R_local 5 \
         --lrate 0.01 \
         --lrate_decay 0.9 \
