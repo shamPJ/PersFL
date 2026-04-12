@@ -99,7 +99,7 @@ class FedAvg:
         if true_weights is not None:
             true_weights = torch.tensor(true_weights, device=device)
 
-        self.loss_history = np.zeros((n_clients, self.R), device=device)
+        self.loss_history = np.zeros((n_clients, self.R))
 
         # --------------------------------
         # Main loop

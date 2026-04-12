@@ -47,7 +47,7 @@ echo "========================================"
 # ===============================
 srun python scripts/main.py \
     --n_clients 10 \
-    --n_clusters 2 \
+    --n_clusters 4 \
     --n_classes 10 \
     --n_samples 500 \
     --n_samples_val 1000 \
@@ -57,7 +57,7 @@ srun python scripts/main.py \
     --R 50 \
     --R_local 5 \
     --lrate 0.01 \
-    --lrate_decay 0.9 \
+    --lrate_decay 0.98 \
     --S 5 \
     --fname ${OUT_DIR}/Algorithm1/cnn_cifar10_iid_${SEED}.csv \
     --device cuda \
@@ -82,7 +82,7 @@ srun python scripts/main.py \
 
 srun python scripts/main.py \
         --n_clients 10 \
-        --n_clusters 2 \
+        --n_clusters 4 \
         --n_classes 10 \
 	--n_samples 500 \
     	--n_samples_val 1000 \
@@ -91,8 +91,8 @@ srun python scripts/main.py \
         --algo FedAvg \
         --R 50 \
         --R_local 5 \
-        --lrate 0.01 \
-        --lrate_decay 0.9 \
+        --lrate 0.05 \
+        --lrate_decay 0.98 \
         --S 9 \
         --fname ${OUT_DIR}/FedAvg/cnn_cifar10_iid_${SEED}.csv \
         --device cuda \

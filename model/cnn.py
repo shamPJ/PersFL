@@ -15,23 +15,27 @@ class CNN(nn.Module):
         C, H, W = input_shape
         
         # Convolutional layers
-        self.conv1 = nn.Conv2d(C, 32, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
-        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
-        #self.conv4 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(C, 32, 3, padding=1)
+        self.bn1 = nn.BatchNorm2d(32)
+
+        self.conv2 = nn.Conv2d(32, 64, 3, padding=1)
+        self.bn2 = nn.BatchNorm2d(64)
+
+        self.conv3 = nn.Conv2d(64, 128, 3, padding=1)
+        self.bn3 = nn.BatchNorm2d(128)
         self.pool = nn.MaxPool2d(2, 2)
-        
+
         # Use dummy forward to infer FC input size
         with torch.no_grad():
-            x = torch.zeros(1, C, H, W)  # batch size 1
-            x = F.relu(self.conv1(x))
-            x = F.relu(self.conv2(x))
+            self.eval()
+            x = torch.zeros(1, C, H, W)
+            x = F.relu(self.bn1(self.conv1(x)))
+            x = F.relu(self.bn2(self.conv2(x)))
             x = self.pool(x)
-            x = F.relu(self.conv3(x))
+            x = F.relu(self.bn3(self.conv3(x)))
             x = self.pool(x)
-            #x = F.relu(self.conv4(x))
-            #x = self.pool(x)
             fc_input_size = x.shape[1] * x.shape[2] * x.shape[3]
+            self.train()
         
         # Fully connected layers
         self.fc1 = nn.Linear(fc_input_size, 256)
@@ -39,14 +43,12 @@ class CNN(nn.Module):
     
     def forward(self, x):
         # Conv layers with ReLU + pooling
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = F.relu(self.bn2(self.conv2(x)))
         x = self.pool(x)
-        x = F.relu(self.conv3(x))
+        x = F.relu(self.bn3(self.conv3(x)))
         x = self.pool(x)
-        #x = F.relu(self.conv4(x))
-        #x = self.pool(x)
-        
+       
         # Flatten and fully connected
         x = torch.flatten(x, 1)
         x = F.relu(self.fc1(x))
