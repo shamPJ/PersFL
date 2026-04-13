@@ -4,8 +4,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
-dir = "cnn_cifar10_iid/Algorithm1"
-# dir = "cnn_cifar10_iid/FedAvg"
+# dir = "cnn_cifar10_iid/Algorithm1"
+dir = "cnn_cifar10_iid/FedAvg"
 csvs = glob.glob(os.path.join("results", dir, "cnn_cifar10_iid_0.csv"))
 print(csvs)
 # dfs = []
