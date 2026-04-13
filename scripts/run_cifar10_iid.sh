@@ -46,7 +46,7 @@ echo "========================================"
 # Run experiment
 # ===============================
 srun python scripts/main.py \
-    --n_clients 10 \
+    --n_clients 20 \
     --n_clusters 4 \
     --n_classes 10 \
     --n_samples 500 \
@@ -81,7 +81,7 @@ srun python scripts/main.py \
 #     --seed $SEED 
 
 srun python scripts/main.py \
-        --n_clients 10 \
+        --n_clients 20 \
         --n_clusters 4 \
         --n_classes 10 \
 	--n_samples 500 \
