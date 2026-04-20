@@ -35,13 +35,13 @@ EXPS=(
 )
 
 for EXP in "${EXPS[@]}"; do
-    mkdir -p "${OUT_DIR}/${EXP}/${ALG}"
+    mkdir -p "${OUT_DIR}/${EXP}/${ALG}_local"
 done
 
 # ===============================
 # Choose experiment (must match EXPS)
 # ===============================
-exp="linear_syn_nclusters"
+exp="linear_syn_dm"
 
 # ===============================
 # Parameter selection
@@ -131,7 +131,7 @@ srun python scripts/main.py \
     --R 0 \
     --S 30 \
     $EXTRA_ARGS \
-    --fname "${OUT_DIR}/${SUBDIR}/${ALG}/linear_syn_${PARAM}_${SEED}_local.csv" \
+    --fname "${OUT_DIR}/${SUBDIR}/${ALG}_local/linear_syn_${PARAM}_${SEED}.csv" \
     --device cpu \
     --problem regression \
     --seed "$SEED"

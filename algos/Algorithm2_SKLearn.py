@@ -130,4 +130,15 @@ class Algorithm2_SKLearn:
             for metric_name in self.metrics.keys():
                 self.metrics_history[metric_name][r] = metrics_sums[metric_name] / n_clients
 
+        if self.R == 0:
+            # If R=0, evaluate local models on validation set
+            self.metrics_history = {name: np.zeros(1) for name in self.metrics.keys()}
+            metrics_sums = {name: 0.0 for name in self.metrics.keys()}
+            for i in range(n_clients):
+                val_pred = self.client_models[i].predict(X_val[i])
+                for metric_name, metric_fn in self.metrics.items():
+                    metrics_sums[metric_name] += metric_fn(torch.from_numpy(val_pred).reshape(-1,1), y_val[i].reshape(-1,1)).item()
+            for metric_name in self.metrics.keys():
+                self.metrics_history[metric_name][0] = metrics_sums[metric_name] / n_clients
+
         return self.client_models
