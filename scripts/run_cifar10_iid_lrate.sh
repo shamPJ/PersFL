@@ -18,7 +18,7 @@ exp="FedAvg"
 
 case "$exp" in
     Algorithm1)
-        ARGS="--algo Algorithm1 --S 5"
+        ARGS="--algo Algorithm1 --S 8"
         LRATES=(0.01 0.02 0.03)
         SUBDIR="Algorithm1"
         ;;
