@@ -4,6 +4,20 @@ import glob
 import os
 import re
 
+EXPERIMENT_META = {
+    "linear_syn_dm": "data_n_features",
+    "linear_syn_noise": "data_noise_scale",
+    "linear_syn_noise_w": "data_noise_weight",
+    "linear_syn_nclusters": "data_n_clusters",
+    "linear_syn_S": "algo_S",
+    "linear_syn_R": "algo_R_local",
+    "linear_syn_lmbd": "algo_lmbd"
+}
+
+ALGO_METRIC = {
+    "Algorithm2_SKLearn": "MSE_val",
+}
+
 def aggregate_for_pgfplots(
     input_dir,
     pattern,
@@ -57,59 +71,75 @@ def aggregate_for_pgfplots(
     out.to_csv(output_file, index=False)
     print(f"Saved → {output_file}")
 
-if __name__ == "__main__":
-    # aggregate_for_pgfplots(
-    #     input_dir="results/linear_syn_dm",
-    #     pattern=r"linear_syn_dm_(\d+(?:\.\d+)?)_(\d+)\.csv",
-    #     param_name="data_n_features",
-    #     output_file="aggregated_dm.csv",
-    #     metric_name="MSE_params",   
-    # )
+def make_pattern(exp_name):
+    r"""
+    Regex pattern:
+    rf"{exp_name}_(\d+(?:\.\d+)?)_(\d+)\.csv"
+    
+    \d        → any digit (0-9)
+    \d+       → one or more digits (e.g., 3, 42, 100)
+    
+    (\d+(?:\.\d+)?) → captures a number:
+      - \d+          → integer part
+      - (?:\.\d+)?   → optional decimal part (e.g., ".5")
+      → matches both integers (10) and floats (10.5)
+    
+    (?:\.\d+)?  → optional decimal part
+    (...)   → grouping
+    ?:      → non-capturing group (group, but don't store it separately)
+    \.      → literal dot "."
+    \d+     → one or more digits
+    (...)? → the whole group is optional
 
-    # aggregate_for_pgfplots(
-    #     input_dir="results/linear_syn_dm/Algorithm2",
-    #     pattern=r"linear_syn_dm_(\d+(?:\.\d+)?)_(\d+)\.csv",
-    #     param_name="data_n_features",
-    #     output_file="aggregated_dm_Algorithm2.csv",
-    #     metric_name="MSE_params",   
-    # )
+    (\d+) → captures the seed (integer)
+    
+    \.csv → matches the literal ".csv" (dot must be escaped)
+    
+    rf""  → raw f-string:
+      - r = raw string (no escaping of backslashes)
+      - f = allows inserting {exp_name}
+    """
+    return rf"{exp_name}_(\d+(?:\.\d+)?)_(\d+)\.csv"
 
-    aggregate_for_pgfplots(
-        input_dir="results/linear_syn_noise/Algorithm2",
-        pattern=r"linear_syn_noise_(\d+(?:\.\d+)?)_(\d+)\.csv",
-        param_name="data_noise_scale",
-        output_file="aggregated_noise_Algorithm2.csv",
-        metric_name="MSE_params",   
-    )
+BASE_DIR = "results"
+OUTPUT_DIR = "results/aggregated_csv"
 
-    # aggregate_for_pgfplots(
-    #     input_dir="results/linear_syn_S/Algorithm2",
-    #     pattern=r"linear_syn_S_(\d+)_(\d+)\.csv",
-    #     param_name="algo_S",
-    #     output_file="aggregated_S_Algorithm2.csv",
-    #     metric_name="MSE_params",   
-    # )
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    aggregate_for_pgfplots(
-        input_dir="results/linear_syn_noise_w/Algorithm2",
-        pattern=r"linear_syn_noise_w_(\d+(?:\.\d+)?)_(\d+)\.csv",
-        param_name="data_noise_weight",
-        output_file="aggregated_noise_weight_Algorithm2.csv",
-        metric_name="MSE_params",   
-    )
+for exp_name in os.listdir(BASE_DIR):
+    exp_path = os.path.join(BASE_DIR, exp_name)
 
-    aggregate_for_pgfplots(
-        input_dir="results/linear_syn_nclusters/Algorithm2",
-        pattern=r"linear_syn_nclusters_(\d+(?:\.\d+)?)_(\d+)\.csv",
-        param_name="data_n_clusters",
-        output_file="aggregated_nclusters_Algorithm2.csv",
-        metric_name="MSE_params",   
-    )
+    if not os.path.isdir(exp_path):
+        continue
 
-    # aggregate_for_pgfplots(
-    #     input_dir="results/linear_syn_R/Algorithm2",
-    #     pattern=r"linear_syn_R_(\d+(?:\.\d+)?)_(\d+)\.csv",
-    #     param_name="algo_R_local",
-    #     output_file="aggregated_R_Algorithm2.csv",
-    #     metric_name="MSE_params",   
-    # )
+    if exp_name not in EXPERIMENT_META:
+        continue  # skip irrelevant folders
+
+    param_name = EXPERIMENT_META[exp_name]
+
+    # find algorithms inside experiment
+    for algo in os.listdir(exp_path):
+        algo_path = os.path.join(exp_path, algo)
+
+        if not os.path.isdir(algo_path):
+            continue
+
+        pattern = make_pattern(exp_name)
+
+        output_file = os.path.join(
+            OUTPUT_DIR,
+            f"{exp_name}_{algo}.csv"
+        )
+
+        print(f"Processing: {exp_name} / {algo}")
+
+        metric_name = ALGO_METRIC.get(algo, "MSE_params")
+
+        aggregate_for_pgfplots(
+            input_dir=algo_path,
+            pattern=pattern,
+            param_name=param_name,
+            output_file=output_file,
+            metric_name=metric_name,
+        )
+

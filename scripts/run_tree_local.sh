@@ -128,10 +128,10 @@ srun python scripts/main.py \
     --lmbd 0.05 \
     --dataset synthetic \
     --algo "$ALG" \
-    --R 200 \
+    --R 0 \
     --S 30 \
     $EXTRA_ARGS \
-    --fname "${OUT_DIR}/${SUBDIR}/${ALG}/linear_syn_${PARAM}_${SEED}.csv" \
+    --fname "${OUT_DIR}/${SUBDIR}/${ALG}/linear_syn_${PARAM}_${SEED}_local.csv" \
     --device cpu \
     --problem regression \
     --seed "$SEED"
