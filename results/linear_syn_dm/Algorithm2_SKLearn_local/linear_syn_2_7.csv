@@ -1,1 +1,2 @@
-
+iter,loss_mean,MSE_val,data_n_clusters,data_n_clients,data_n_samples,data_n_samples_val,data_n_features,data_noise_scale,data_noise_weight,model_max_depth,algo_lmbd,algo_S,algo_R
+0,,6.170459107276128,3,150,10,500,2,0,0,5,0.05,30,0

@@ -127,10 +127,11 @@ if __name__ == "__main__":
     flat_algo  = flatten_dict(full_algo_params, parent_key="algo")
 
     rows = []
-    for r in range(R):
+    
+    for r in range(max(1,R)):
         row = {
             "iter": r,
-            "loss_mean": loss_hist[:, r].mean()
+            "loss_mean": loss_hist[:, r].mean() if loss_hist.size > 0 else float("nan")
         }
 
         # Add metrics from dictionary of tensors algo.metrics_history if it exists
