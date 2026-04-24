@@ -68,7 +68,7 @@ DATASETS = {
 ALGOS = {
     "Algorithm1": AlgoSpec(module="algos.Algorithm1", cls="Algorithm1", default_params={
         "lrate": 0.01,
-        "lrate_decay": None,
+        "lrate_decay": 0.999,
         "S": 30,
         "R": 1500,
         "R_local": 0}),
@@ -90,5 +90,13 @@ ALGOS = {
         "lrate_decay": 0.999,
         "S": 10,
         "R": 500,
-        "R_local": 5})
+        "R_local": 5}),
+
+    "FedProx": AlgoSpec(module="algos.FedProx", cls="FedProx", default_params={
+        "lrate": 0.01,
+        "lrate_decay": 0.999,
+        "S": 10,
+        "R": 500,
+        "R_local": 10,
+        "mu": 0.01})      
 }

@@ -6,16 +6,17 @@ import re
 
 EXPERIMENT_META = {
     "linear_syn_dm": "data_n_features",
-    "linear_syn_noise": "data_noise_scale",
-    "linear_syn_noise_w": "data_noise_weight",
-    "linear_syn_nclusters": "data_n_clusters",
-    "linear_syn_S": "algo_S",
-    "linear_syn_R": "algo_R_local",
-    "linear_syn_lmbd": "algo_lmbd"
+    # "linear_syn_noise": "data_noise_scale",
+    # "linear_syn_noise_w": "data_noise_weight",
+    # "linear_syn_nclusters": "data_n_clusters",
+    # "linear_syn_S": "algo_S",
+    # "linear_syn_R": "algo_R_local",
+    # "linear_syn_lmbd": "algo_lmbd"
 }
 
 ALGO_METRIC = {
     "Algorithm2_SKLearn": "MSE_val",
+    "Algorithm2_SKLearn_local": "MSE_val"
 }
 
 def aggregate_for_pgfplots(
@@ -28,11 +29,10 @@ def aggregate_for_pgfplots(
     files = glob.glob(os.path.join(input_dir, "*.csv"))
 
     data = {}
-
+    
     for f in files:
         fname = os.path.basename(f)
         match = re.search(pattern, fname)
-
         if not match:
             continue
 

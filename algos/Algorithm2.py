@@ -109,8 +109,10 @@ class Algorithm2:
         n_clients = X_train.shape[0]
 
         if len(X_train.shape) == 3:
+            # synthetic regression data of shape (n_clients, m_i, d)
             X_pub = torch.randn((100, X_train.shape[2])) # fixed test set for regularization
         elif len(X_train.shape) == 5:
+            # cifar10 data of shape (n_clients, m_i, 3, 32, 32)
             mean = torch.tensor([0.4914, 0.4822, 0.4465]).view(1,3,1,1)
             std = torch.tensor([0.2023, 0.1994, 0.2010]).view(1,3,1,1)
 
@@ -201,7 +203,10 @@ class Algorithm2:
                     
                     metrics_sums[metric_name] += metric_value.detach()
 
-                del X_val_i, y_val_i, val_predictions
+                try:
+                    del X_val_i, y_val_i, val_predictions
+                except NameError:
+                    pass
 
             for metric_name in self.metrics.keys():
                 self.metrics_history[metric_name][r] = metrics_sums[metric_name] / n_clients

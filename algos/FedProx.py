@@ -5,7 +5,7 @@ import copy
 from torch import nn
 
 class FedProx:
-    def __init__(self, model_fn, loss_fn, metrics, R=50, R_local=0, S=20,
+    def __init__(self, model_fn, loss_fn, metrics, R=50, R_local=10, S=20,
                  lrate=0.01, lrate_decay=None, mu=0.1,
                  device='cpu', seed=None):
         self.model_fn = model_fn
@@ -56,28 +56,25 @@ class FedProx:
         data_size = X.shape[0]
         batch_size = min(32, data_size)
 
-        for r in range(self.R_local):
-            perm = torch.randperm(data_size, device=self.device)
-            X_shuffled = X[perm]
-            y_shuffled = y[perm]
+        for r in range(self.R_local): # note this is n.o. local gradient steps, not epochs
+             # sample minibatch (stochasticity is essential in FedProx)
+            idx = torch.randint(0, data_size, (batch_size,), device=self.device)
 
-            for start in range(0, data_size, batch_size):
-                end = start + batch_size
-                X_batch = X_shuffled[start:end]
-                y_batch = y_shuffled[start:end]
+            X_batch = X[idx]
+            y_batch = y[idx]
 
-                pred = model(X_batch)
-                loss = self.loss_fn(pred, y_batch)
+            pred = model(X_batch)
+            loss = self.loss_fn(pred, y_batch)
 
-                # Add proximal term: mu/2 * ||w - w_global||^2
-                prox_term = 0.0
-                for w, w_global in zip(model.parameters(), global_params):
-                    prox_term += ((w - w_global)**2).sum()
-                loss += (self.mu / 2) * prox_term
+            # Add proximal term: mu/2 * ||w - w_global||^2
+            prox_term = 0.0
+            for p, g in zip(model.parameters(), global_params):
+                prox_term += ((p - g) ** 2).sum()
+            loss += (self.mu / 2) * prox_term
 
-                grads = torch.autograd.grad(loss, model.parameters(), create_graph=False)
+            grads = torch.autograd.grad(loss, model.parameters(), create_graph=False)
 
-                with torch.no_grad():
+            with torch.no_grad():
                     for i, (p, g) in enumerate(zip(model.parameters(), grads)):
                         p -= self.lrate * g
 
@@ -117,13 +114,13 @@ class FedProx:
             local_params_list = []
             local_sizes = []
 
+            global_params = [p.detach().clone() for p in self.global_model.parameters()]
             for i in selected_clients:
                 local_model = copy.deepcopy(self.global_model)
                 X_i = X_train[i]
                 y_i = y_train[i]
 
                 # Pass global parameters for proximal term
-                global_params = [p.clone() for p in self.global_model.parameters()]
                 self.local_train(local_model, X_i, y_i, global_params)
 
                 local_sizes.append(X_i.shape[0])

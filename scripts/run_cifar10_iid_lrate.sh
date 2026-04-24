@@ -28,6 +28,12 @@ case "$exp" in
         LRATES=(0.05 0.06 0.07)
         SUBDIR="FedAvg"
         ;;
+    
+    FedProx)
+        ARGS="--algo FedProx --S 11"
+        LRATES=(0.05 0.06 0.07)
+        SUBDIR="FedProx"
+        ;;
 
     *)
         echo "Unknown experiment: $exp"

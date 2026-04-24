@@ -131,7 +131,7 @@ srun python scripts/main.py \
     --R 0 \
     --S 30 \
     $EXTRA_ARGS \
-    --fname "${OUT_DIR}/${SUBDIR}/${ALG}_local/linear_syn_${PARAM}_${SEED}.csv" \
+    --fname "${OUT_DIR}/${SUBDIR}/${ALG}_local/${exp}_${PARAM}_${SEED}.csv" \
     --device cpu \
     --problem regression \
     --seed "$SEED"

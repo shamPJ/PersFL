@@ -34,6 +34,7 @@ class Algorithm1:
         
         # client models initialized later
         self.client_models = None
+        self.candidate_model = self.model_fn().to(self.device)
         self.loss_history = None # training loss as torch tensor (n_clients, R)
         self.metrics_history = {name: torch.zeros(self.R, device=self.device) for name in metrics.keys()}
 
@@ -144,10 +145,10 @@ class Algorithm1:
             candidate_indices = []
             for i in range(n_clients):
                 pool = torch.cat([
-                    torch.arange(0, i, device=device),
-                    torch.arange(i+1, n_clients, device=device)
+                    torch.arange(0, i),
+                    torch.arange(i+1, n_clients)
                 ])
-                idx = pool[torch.randperm(n_clients - 1, device=device)[:self.S]]
+                idx = pool[torch.randperm(n_clients - 1)[:self.S]]
                 candidate_indices.append(idx)
 
             # Step 2: compute candidate updates
@@ -174,10 +175,11 @@ class Algorithm1:
                 for metric_name, metric_fn in self.metrics.items():
                     if metric_name == "MSE_params":
                         # only for linear models
-                        cluster_id = cluster_labels[i]
-                        param_tensor = list(best_params.values())[0]
                         if true_weights is None or cluster_labels is None:
                             raise ValueError("MSE_params requires both true_weights and cluster_labels")
+                        cluster_id = cluster_labels[i]
+                        param_tensor = list(best_params.values())[0]
+    
                         # out is scalar tensor
                         metric_value = metric_fn(torch.squeeze(param_tensor), true_weights[cluster_id])
                     else:
@@ -190,7 +192,10 @@ class Algorithm1:
 
                     metrics_sums[metric_name] += metric_value.detach()
 
-                del X_val_i, y_val_i, val_predictions
+                try:
+                    del X_val_i, y_val_i, val_predictions
+                except NameError:
+                    pass
 
             for metric_name in self.metrics.keys():
                 self.metrics_history[metric_name][r] = metrics_sums[metric_name] / n_clients
@@ -220,37 +225,39 @@ class Algorithm1:
         S = len(X_candidates)
 
         # Ensure model does not modify running stats for candidates
-        model.eval()  # freeze batchnorm/dropout stats
-        candidate_model = self.model_fn().to(device) # reuse model for memory save
+        base_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
+        candidate_model = self.candidate_model # reuse model for memory save
         
         best_loss = torch.tensor(float("inf"), device=device)
         best_params = None
 
         for i in range(S):
             # start from clients' model / params
-            candidate_model.load_state_dict(model.state_dict())
+            candidate_model.load_state_dict(base_state, strict=True)
             candidate_model.train()
+            for m in candidate_model.modules():
+                if isinstance(m, nn.BatchNorm2d):
+                    m.eval()
 
             data_size = X_candidates[i].shape[0]
             batch_size = min(16, data_size)
+
+            X_i = X_candidates[i].to(device)
+            y_i = y_candidates[i].to(device)
+
             # train on candidates data
             for _ in range(self.R_local):
                 # Shuffle the dataset at the start of each epoch
                 perm = torch.randperm(data_size, device=X_candidates[i].device)
-                X_shuffled = X_candidates[i][perm]
-                y_shuffled = y_candidates[i][perm]
+                X_shuffled = X_i[perm]
+                y_shuffled = y_i[perm]
 
                 # Iterate over minibatches
                 for start in range(0, data_size, batch_size):
                     end = start + batch_size
 
-                    # KEEP these on CPU
-                    X_batch_cpu = X_shuffled[start:end]
-                    y_batch_cpu = y_shuffled[start:end]
-
-                    # MOVE only the batch to GPU
-                    X_batch = X_batch_cpu.to(self.device, non_blocking=True)
-                    y_batch = y_batch_cpu.to(self.device, non_blocking=True)
+                    X_batch = X_shuffled[start:end]
+                    y_batch = y_shuffled[start:end]
 
                     pred = candidate_model(X_batch)
                     loss = self.loss_fn(pred, y_batch)
@@ -273,7 +280,5 @@ class Algorithm1:
             if loss < best_loss:
                 best_loss = loss
                 best_params = {k: v.clone().cpu() for k, v in candidate_model.state_dict().items()}
-
-        del candidate_model
 
         return best_loss, best_params
