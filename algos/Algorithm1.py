@@ -239,8 +239,12 @@ class Algorithm1:
         base_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
         candidate_model = self.candidate_model # reuse model for memory save
         
-        best_loss = torch.tensor(float("inf"), device=device)
-        best_params = None
+        # best_loss = torch.tensor(float("inf"), device=device)
+        with torch.no_grad():
+            pred = self.client_models[i](X_train_i.to(device))
+            best_loss = self.loss_fn(pred, y_train_i.to(device))
+        best_params = base_state  # default to keeping own model
+        # best_params = None
 
         for i in range(S):
             # start from clients' model / params
