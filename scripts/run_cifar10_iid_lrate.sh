@@ -14,7 +14,7 @@
 module load mamba
 source activate pytorch-env-cuda118
 
-exp="FedAvg"
+exp="Algorithm1"
 
 case "$exp" in
     Algorithm1)
