@@ -18,7 +18,7 @@ exp="Algorithm1"
 
 case "$exp" in
     Algorithm1)
-        ARGS="--algo Algorithm1 --S 10 --R_local 5"
+        ARGS="--algo Algorithm1 --S 10 --R_local 10"
         LRATES=(0.01 0.02 0.03)
         SUBDIR="Algorithm1"
         ;;

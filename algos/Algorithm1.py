@@ -61,12 +61,15 @@ class Algorithm1:
 
         data_size = X.shape[0]
         batch_size = min(32, data_size)
+        
+        X_i = X.to(self.device)
+        y_i = y.to(self.device)
 
         for r in range(self.R_local): # note this is n.o. local gradient steps, not epochs
             idx = torch.randint(0, data_size, (batch_size,), device=self.device)
 
-            X_batch = X[idx]
-            y_batch = y[idx]
+            X_batch = X_i[idx]
+            y_batch = y_i[idx]
 
             pred = model(X_batch)
             loss = self.loss_fn(pred, y_batch)
