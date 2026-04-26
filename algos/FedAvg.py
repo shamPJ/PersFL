@@ -55,7 +55,6 @@ class FedAvg:
         batch_size = min(32, data_size)
 
         for r in range(self.R_local): # note this is n.o. local gradient steps, not epochs
-             # sample minibatch (stochasticity is essential in FedProx)
             idx = torch.randint(0, data_size, (batch_size,), device=self.device)
 
             X_batch = X[idx]

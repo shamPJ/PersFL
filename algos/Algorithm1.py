@@ -62,25 +62,19 @@ class Algorithm1:
         data_size = X.shape[0]
         batch_size = min(32, data_size)
 
-        for _ in range(self.R_local):
-            # Shuffle the dataset at the start of each epoch
-            perm = torch.randperm(data_size, device=X.device)
-            X_shuffled = X[perm]
-            y_shuffled = y[perm]
+        for r in range(self.R_local): # note this is n.o. local gradient steps, not epochs
+            idx = torch.randint(0, data_size, (batch_size,), device=self.device)
 
-            # Iterate over minibatches
-            for start in range(0, data_size, batch_size):
-                end = start + batch_size
-                X_batch = X_shuffled[start:end].to(self.device, non_blocking=True)
-                y_batch = y_shuffled[start:end].to(self.device, non_blocking=True)
+            X_batch = X[idx]
+            y_batch = y[idx]
 
-                pred = model(X_batch)
-                loss = self.loss_fn(pred, y_batch)
+            pred = model(X_batch)
+            loss = self.loss_fn(pred, y_batch)
 
-                grads = torch.autograd.grad(loss, model.parameters(), create_graph=False)
+            grads = torch.autograd.grad(loss, model.parameters(), create_graph=False)
 
-                with torch.no_grad():
-                    for p, g in zip(model.parameters(), grads):
+            with torch.no_grad():
+                for p, g in zip(model.parameters(), grads):
                         p -= self.lrate * g
     
     # --------------------------------
@@ -239,12 +233,8 @@ class Algorithm1:
         base_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
         candidate_model = self.candidate_model # reuse model for memory save
         
-        # best_loss = torch.tensor(float("inf"), device=device)
-        with torch.no_grad():
-            pred = model(X_train_i)
-            best_loss = self.loss_fn(pred, y_train_i)
-        best_params = base_state  # default to keeping own model
-        # best_params = None
+        best_loss = torch.tensor(float("inf"), device=device)
+        best_params = None
 
         for i in range(S):
             # start from clients' model / params
@@ -255,36 +245,29 @@ class Algorithm1:
                     m.eval()
 
             data_size = X_candidates[i].shape[0]
-            batch_size = min(16, data_size)
+            batch_size = min(32, data_size)
 
             X_i = X_candidates[i].to(device)
             y_i = y_candidates[i].to(device)
 
             # train on candidates data
             for _ in range(self.R_local):
-                # Shuffle the dataset at the start of each epoch
-                perm = torch.randperm(data_size, device=X_candidates[i].device)
-                X_shuffled = X_i[perm]
-                y_shuffled = y_i[perm]
+                idx = torch.randint(0, data_size, (batch_size,), device=self.device)
 
-                # Iterate over minibatches
-                for start in range(0, data_size, batch_size):
-                    end = start + batch_size
+                X_batch = X_i[idx]
+                y_batch = y_i[idx]
 
-                    X_batch = X_shuffled[start:end]
-                    y_batch = y_shuffled[start:end]
+                pred = candidate_model(X_batch)
+                loss = self.loss_fn(pred, y_batch)
 
-                    pred = candidate_model(X_batch)
-                    loss = self.loss_fn(pred, y_batch)
+                grads = torch.autograd.grad(loss, candidate_model.parameters(), create_graph=False)
 
-                    grads = torch.autograd.grad(loss, candidate_model.parameters(), create_graph=False)
-
-                    with torch.no_grad():
-                        for p, g in zip(candidate_model.parameters(), grads):
-                            p -= self.lrate * g
-                    
-                    # cleanup
-                    del X_batch, y_batch, pred, loss, grads
+                with torch.no_grad():
+                    for p, g in zip(candidate_model.parameters(), grads):
+                        p -= self.lrate * g
+                
+                # cleanup
+                del X_batch, y_batch, pred, loss, grads
             
             # eval trained model on client's local data
             with torch.no_grad():
