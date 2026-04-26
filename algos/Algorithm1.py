@@ -166,7 +166,18 @@ class Algorithm1:
                                                             )
 
                 self.loss_history[i, r] = best_loss.detach().cpu().item()
-                self.client_models[i].load_state_dict({k: v.to(self.device) for k, v in best_params.items()})
+                best_params_filtered = {
+                    k: v for k, v in best_params.items()
+                    if not any(bn_key in k for bn_key in [
+                        'running_mean', 'running_var', 'num_batches_tracked'
+                    ])
+                }
+
+                # Load filtered params, keeping client's own BN stats intact
+                state = self.client_models[i].state_dict()
+                state.update({k: v.to(self.device) for k, v in best_params_filtered.items()})
+                self.client_models[i].load_state_dict(state)
+                # self.client_models[i].load_state_dict({k: v.to(self.device) for k, v in best_params.items()})
 
                 # -----------------------------
                 # Evaluate metrics for this iteration
