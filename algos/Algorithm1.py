@@ -241,8 +241,8 @@ class Algorithm1:
         
         # best_loss = torch.tensor(float("inf"), device=device)
         with torch.no_grad():
-            pred = self.client_models[i](X_train_i.to(device))
-            best_loss = self.loss_fn(pred, y_train_i.to(device))
+            pred = model(X_train_i)
+            best_loss = self.loss_fn(pred, y_train_i)
         best_params = base_state  # default to keeping own model
         # best_params = None
 

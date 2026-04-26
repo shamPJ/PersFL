@@ -80,7 +80,7 @@ srun python scripts/main.py \
     --dataset cifar10 \
     --R 50 \
     --lrate $LRATE \
-    --lrate_decay 0.98 \
+    --lrate_decay 0.99 \
     $ARGS \
     --fname "${OUT_DIR}/${SUBDIR}/cnn_cifar10_iid_c${N_CLUSTERS}_lr${LRATE}_seed${SEED}.csv" \
     --device cuda \
