@@ -5,7 +5,7 @@ import copy
 from torch import nn
 
 class FedAvg:
-    def __init__(self, model_fn, loss_fn, metrics, R=50, R_local=0, S=20,
+    def __init__(self, model_fn, loss_fn, metrics, R=50, R_local=10, S=20,
         lrate=0.01, lrate_decay=None,
         device='cpu', seed=None
     ):
@@ -54,26 +54,21 @@ class FedAvg:
         data_size = X.shape[0]
         batch_size = min(32, data_size)
 
-        for r in range(self.R_local):
-            # Shuffle the dataset at the start of each epoch
-            perm = torch.randperm(data_size, device=self.device)
-            X_shuffled = X[perm]
-            y_shuffled = y[perm]
+        for r in range(self.R_local): # note this is n.o. local gradient steps, not epochs
+             # sample minibatch (stochasticity is essential in FedProx)
+            idx = torch.randint(0, data_size, (batch_size,), device=self.device)
 
-            # Iterate over minibatches
-            for start in range(0, data_size, batch_size):
-                end = start + batch_size
-                X_batch = X_shuffled[start:end]
-                y_batch = y_shuffled[start:end]
+            X_batch = X[idx]
+            y_batch = y[idx]
 
-                pred = model(X_batch)
-                loss = self.loss_fn(pred, y_batch)
+            pred = model(X_batch)
+            loss = self.loss_fn(pred, y_batch)
 
-                grads = torch.autograd.grad(loss, model.parameters(), create_graph=False)
+            grads = torch.autograd.grad(loss, model.parameters(), create_graph=False)
 
-                with torch.no_grad():
-                    for i, (p, g) in enumerate(zip(model.parameters(), grads)):
-                        p -= self.lrate * g
+            with torch.no_grad():
+                for i, (p, g) in enumerate(zip(model.parameters(), grads)):
+                    p -= self.lrate * g
 
     # --------------------------------
     # Run
@@ -154,7 +149,7 @@ class FedAvg:
                 self.loss_history[i, r] = self.loss_fn(pred, y_train[i]).detach().cpu().item()
 
             # --------------------------------
-            # Step 5: metric evaluation 
+            # Step 4: metric evaluation 
             # --------------------------------
             metrics_sums = {
                 name: torch.tensor(0.0, device=device)

@@ -61,6 +61,8 @@ DATASETS = {
     "cifar10": DatasetSpec(module="data.cifar10", loader="generate_rotated_cifar10", default_params={
         "n_clients": 200,
         "n_clusters": 4,
+        "n_samples": 200,
+        "n_samples_val": 1000,
         "seed": 0
     })
 }

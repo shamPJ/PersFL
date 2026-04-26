@@ -53,6 +53,7 @@ class FedProx:
     # -------------------------------
     def local_train(self, model, X, y, global_params):
         model.train()
+        
         data_size = X.shape[0]
         batch_size = min(32, data_size)
 
