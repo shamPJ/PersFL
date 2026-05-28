@@ -59,22 +59,22 @@ echo "========================================"
 # ===============================
 # Run experiment
 # ===============================
-# srun python scripts/main.py \
-#     --n_clients 150 \
-#     --n_clusters 3 \
-#     --n_features 10 \
-#     --model linreg \
-#     --dataset synthetic \
-#     --noise_scale $NOISE \
-#     --algo Algorithm1 \
-#     --R 1500 \
-#     --R_local 0 \
-#     --lrate 0.01 \
-#     --S 30 \
-#     --fname ${OUT_DIR}/Algorithm1/linear_syn_noise_${NOISE}_${SEED}.csv \
-#     --device cuda \
-#     --problem regression \
-#     --seed $SEED 
+srun python scripts/main.py \
+    --n_clients 150 \
+    --n_clusters 3 \
+    --n_features 10 \
+    --model linreg \
+    --dataset synthetic \
+    --noise_scale $NOISE \
+    --algo Algorithm1 \
+    --R 300 \
+    --R_local 2 \
+    --lrate 0.01 \
+    --S 5 \
+    --fname ${OUT_DIR}/Algorithm1/linear_syn_noise_${NOISE}_${SEED}.csv \
+    --device cuda \
+    --problem regression \
+    --seed $SEED 
 
 srun python scripts/main.py \
     --n_clients 150 \
@@ -84,10 +84,10 @@ srun python scripts/main.py \
     --dataset synthetic \
     --noise_scale $NOISE \
     --algo Algorithm2 \
-    --R 1500 \
-    --R_local 0 \
+    --R 300 \
+    --R_local 2 \
     --lrate 0.01 \
-    --S 30 \
+    --S 5 \
     --fname ${OUT_DIR}/Algorithm2/linear_syn_noise_${NOISE}_${SEED}.csv \
     --device cuda \
     --problem regression \

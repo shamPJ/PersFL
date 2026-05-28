@@ -19,11 +19,11 @@ export PYTHONPATH=$PYTHONPATH:$PWD
 # ===============================
 # Sweep grids
 # ===============================
-PARAM_LIST=(10 20 30 50)         # candidate set size grid
+PARAM_LIST=(3 5 8 10)         # candidate set size grid
 SEEDS=(0 1 2 3 4 5 6 7 8 9)  # repetitions
 
 # Output directory
-OUT_DIR="$SLURM_SUBMIT_DIR/results/linear_syn_S"
+OUT_DIR="results/linear_syn_S"
 mkdir -p $OUT_DIR
 
 # Algorithm subdirectories
@@ -58,39 +58,36 @@ echo "========================================"
 # ===============================
 # Run experiment
 # ===============================
-# srun python main.py \
-#     --n_clients 150 \
-#     --n_clusters 3 \
-#     --n_features 10 \
-#     --model linreg \
-#     --dataset synthetic \
-#     --algo Algorithm1 \
-#     --R 1500 \
-#     --R_local 0 \
-#     --lrate 0.01 \
-#     --S $PARAM \
-#     --fname ${OUT_DIR}/Algorithm1/linear_syn_S_${PARAM}_${SEED}.csv \
-#     --device cuda \
-#     --problem regression \
-#     --seed $SEED 
+srun python scripts/main.py \
+      --n_clients 150 \
+      --n_clusters 3 \
+      --n_features 10 \
+      --model linreg \
+      --dataset synthetic \
+      --algo Algorithm1 \
+      --R 300 \
+      --R_local 2 \
+      --lrate 0.01 \
+      --S $PARAM \
+      --fname ${OUT_DIR}/Algorithm1/linear_syn_S_${PARAM}_${SEED}.csv \
+      --device cuda \
+      --problem regression \
+      --seed $SEED 
 
 srun python scripts/main.py \
-    --n_clients 150 \
-    --n_clusters 3 \
-    --n_features 10 \
-    --model linreg \
-    --dataset synthetic \
-    --algo Algorithm2 \
-    --R 1500 \
-    --R_local 0 \
-    --lrate 0.01 \
-    --S $PARAM \
-    --fname ${OUT_DIR}/Algorithm2/linear_syn_S_${PARAM}_${SEED}.csv \
-    --device cuda \
-    --problem regression \
-    --seed $SEED 
-
-
-
+   --n_clients 150 \
+   --n_clusters 3 \
+   --n_features 10 \
+   --model linreg \
+   --dataset synthetic \
+   --algo Algorithm2 \
+   --R 300 \
+   --R_local 2 \
+   --lrate 0.01 \
+   --S $PARAM \
+   --fname ${OUT_DIR}/Algorithm2/linear_syn_S_${PARAM}_${SEED}.csv \
+   --device cuda \
+   --problem regression \
+   --seed $SEED 
 
 

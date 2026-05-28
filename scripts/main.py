@@ -60,6 +60,7 @@ if __name__ == "__main__":
     full_model_params = merge_defaults(model_spec.default_params, parsed)
     full_algo_params  = merge_defaults(algo_spec.default_params, parsed)
 
+
     print("Data params:", full_data_params)
     print("Model params:", full_model_params)
     print("Algo params:", full_algo_params)
@@ -80,8 +81,9 @@ if __name__ == "__main__":
     metrics = {}
     if problem_type == "regression":
         loss_fn = nn.MSELoss()
-        # metrics = {"MSE_val": MSE, "MSE_params": MSE_params}
-        metrics = {"MSE_val": MSE}
+        metrics = {"MSE_params": MSE_params, "MSE_test": MSE}
+        if parsed["algo"] == "Algorithm2_SKLearn":
+            metrics = {"MSE_test": MSE}
 
     elif problem_type == "classification":
         loss_fn = nn.CrossEntropyLoss()
@@ -147,5 +149,21 @@ if __name__ == "__main__":
 
     df = pd.DataFrame(rows)
     df.to_csv(fname, index=False)
-
     print(f"Saved results to {fname}")
+
+    if hasattr(algo, "theory_log") and algo.theory_log is not None:
+        log = algo.theory_log
+        n, R_log, S_log = log["xi"].shape
+        ci, ri, si = np.meshgrid(np.arange(n), np.arange(R_log), np.arange(S_log), indexing='ij')
+        df_theory = pd.DataFrame({
+            "client":                 ci.ravel(),
+            "round":                  ri.ravel(),
+            "candidate":              si.ravel(),
+            "xi":                     log["xi"].ravel(),
+            "true_loss_cand":         log["true_loss_cand"].ravel(),
+            "candidate_same_cluster": log["candidate_same_cluster"].ravel(),
+            "seed":                   seed,
+        })
+        theory_fname = fname.replace(".csv", "_theory.csv")
+        df_theory.to_csv(theory_fname, index=False)
+        print(f"Saved theory log to {theory_fname}")

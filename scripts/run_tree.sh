@@ -54,13 +54,13 @@ case "$exp" in
         ;;
 
     linear_syn_lmbd)
-        PARAM_LIST=(0.05 0.1 0.2 0.5)
+        PARAM_LIST=(1 5 10 50)
         EXTRA_ARGS="--lmbd PARAM"
         SUBDIR="linear_syn_lmbd"
         ;;
 
     linear_syn_S)
-        PARAM_LIST=(10 20 30)
+        PARAM_LIST=(3 5 8 10)
         EXTRA_ARGS="--S PARAM"
         SUBDIR="linear_syn_S"
         ;;
@@ -87,6 +87,7 @@ case "$exp" in
         echo "Unknown experiment: $exp"
         exit 1
         ;;
+
 esac
 
 # ===============================
@@ -125,13 +126,12 @@ srun python scripts/main.py \
     --n_clusters 3 \
     --n_features 10 \
     --model decision_tree \
-    --lmbd 0.05 \
+    --lmbd 10 \
     --dataset synthetic \
     --algo "$ALG" \
     --R 200 \
-    --S 30 \
+    --S 8 \
     $EXTRA_ARGS \
-    --fname "${OUT_DIR}/${SUBDIR}/${ALG}/linear_syn_${PARAM}_${SEED}.csv" \
-    --device cpu \
+    --fname "${OUT_DIR}/${SUBDIR}/${ALG}/${exp}_${PARAM}_${SEED}.csv" \
     --problem regression \
     --seed "$SEED"

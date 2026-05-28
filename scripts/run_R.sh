@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=persfl_R_local
+#SBATCH --job-name=syn_R_local
 #SBATCH --time=04:00:00
 #SBATCH --mem=16G
 #SBATCH --cpus-per-task=3 # task is job instance created from the array; each task runs .sh independently
@@ -20,7 +20,7 @@ export PYTHONPATH=$PWD
 # Sweep grids
 # ===============================
 # Sweep parameters
-PARAM_LIST=(0 1 3 5)             # local iters grid R_local
+PARAM_LIST=(1 2 5 10)        # local iters grid R_local
 SEEDS=(0 1 2 3 4 5 6 7 8 9)  # repetitions
 
 # Output directory
@@ -59,21 +59,21 @@ echo "========================================"
 # ===============================
 # Run experiment
 # ===============================
-# srun python main.py \
-#     --n_clients 150 \
-#     --n_clusters 3 \
-#     --n_features 10 \
-#     --model linreg \
-#     --dataset synthetic \
-#     --algo Algorithm1 \
-#     --R 1500 \
-#     --R_local $PARAM \
-#     --lrate 0.01 \
-#     --S 30 \
-#     --fname ${OUT_DIR}/Algorithm1/linear_syn_R_${PARAM}_${SEED}.csv \
-#     --device cuda \
-#     --problem regression \
-#     --seed $SEED 
+srun python scripts/main.py \
+    --n_clients 150 \
+    --n_clusters 3 \
+    --n_features 10 \
+    --model linreg \
+    --dataset synthetic \
+    --algo Algorithm1 \
+    --R 300 \
+    --R_local $PARAM \
+    --lrate 0.01 \
+    --S 5 \
+    --fname ${OUT_DIR}/Algorithm1/linear_syn_R_${PARAM}_${SEED}.csv \
+    --device cuda \
+    --problem regression \
+    --seed $SEED 
 
 srun python scripts/main.py \
     --n_clients 150 \
@@ -82,10 +82,10 @@ srun python scripts/main.py \
     --model linreg \
     --dataset synthetic \
     --algo Algorithm2 \
-    --R 1500 \
+    --R 300 \
     --R_local $PARAM \
     --lrate 0.01 \
-    --S 30 \
+    --S 5 \
     --fname ${OUT_DIR}/Algorithm2/linear_syn_R_${PARAM}_${SEED}.csv \
     --device cuda \
     --problem regression \
