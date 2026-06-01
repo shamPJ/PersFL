@@ -6,17 +6,17 @@ import re
 
 EXPERIMENT_META = {
     "linear_syn_dm": "data_n_features",
-    # "linear_syn_noise": "data_noise_scale",
-    # "linear_syn_noise_w": "data_noise_weight",
-    # "linear_syn_nclusters": "data_n_clusters",
-    # "linear_syn_S": "algo_S",
-    # "linear_syn_R": "algo_R_local",
-    # "linear_syn_lmbd": "algo_lmbd"
+    "linear_syn_noise": "data_noise_scale",
+    "linear_syn_noise_w": "data_noise_weight",
+    "linear_syn_nclusters": "data_n_clusters",
+    "linear_syn_S": "algo_S",
+    "linear_syn_R": "algo_R_local",
+    "linear_syn_lmbd": "algo_lmbd"
 }
 
 ALGO_METRIC = {
-    "Algorithm2_SKLearn": "MSE_val",
-    "Algorithm2_SKLearn_local": "MSE_val"
+    "Algorithm2_SKLearn": "MSE_test",
+    "Algorithm2_SKLearn_local": "MSE_test"
 }
 
 def aggregate_for_pgfplots(
@@ -63,11 +63,11 @@ def aggregate_for_pgfplots(
         runs = np.stack([r[:min_len] for r in runs])
 
         mean = runs.mean(axis=0)
-        sem = runs.std(axis=0) / np.sqrt(runs.shape[0])
+        sd = runs.std(axis=0)
 
         out[f"{param_name}_{p}_mean"] = mean
-        out[f"{param_name}_{p}_upper"] = mean + sem
-        out[f"{param_name}_{p}_lower"] = mean - sem
+        out[f"{param_name}_{p}_upper"] = mean + sd
+        out[f"{param_name}_{p}_lower"] = mean - sd
     out.to_csv(output_file, index=False)
     print(f"Saved → {output_file}")
 
@@ -135,11 +135,14 @@ for exp_name in os.listdir(BASE_DIR):
 
         metric_name = ALGO_METRIC.get(algo, "MSE_params")
 
-        aggregate_for_pgfplots(
-            input_dir=algo_path,
-            pattern=pattern,
-            param_name=param_name,
-            output_file=output_file,
-            metric_name=metric_name,
-        )
+        try:
+            aggregate_for_pgfplots(
+                input_dir=algo_path,
+                pattern=pattern,
+                param_name=param_name,
+                output_file=output_file,
+                metric_name=metric_name,
+            )
+        except Exception as e:
+            print(f"Error processing {exp_name} / {algo}: {e}")
 

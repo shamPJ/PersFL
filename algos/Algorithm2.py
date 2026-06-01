@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from utils.metrics import MSE, MSE_params, accuracy, F1
 
 class Algorithm2:
-    def __init__(self, model_fn, loss_fn, metrics={"MSE_val": MSE}, R=50, R_local=0, S=20, 
+    def __init__(self, model_fn, loss_fn, metrics={"MSE_test": MSE}, R=50, R_local=0, S=20, 
                  lrate=0.01, lrate_decay=None, lmbd=1, device='cpu', seed=None):
         """
         Algorithm2
@@ -101,7 +101,7 @@ class Algorithm2:
         self.set_seed()
 
         X_train, y_train = data["train"]
-        X_val, y_val = data["val"] 
+        X_val, y_val = data["test"] 
         cluster_labels = data.get("cluster_labels", None)
         true_weights = data.get("true_weights", None)
 
@@ -306,7 +306,7 @@ class Algorithm2:
             # keep only smallest loss
             if loss < best_loss:
                 best_loss = loss
-                best_params = {k: v.clone().cpu() for k, v in candidate_model.state_dict().items()}
+                best_params = {k: v.clone().to(device) for k, v in candidate_model.state_dict().items()}
 
         del candidate_model
 

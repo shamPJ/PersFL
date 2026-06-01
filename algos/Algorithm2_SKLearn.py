@@ -4,22 +4,31 @@ import random
 from utils.metrics import MSE, accuracy, F1
 from joblib import Parallel, delayed
 import os
-   
+
 class Algorithm2_SKLearn:
     """
     Algorithm2 adapted for sklearn-style models (DecisionTree, etc.)
+    Supports dynamic cluster participation: each iteration sample only clients from
+    a subset of clusters, mirroring Algorithm1's dynamic mode.
     """
 
-    def __init__(self, model_fn, loss_fn=None, metrics={"MSE_val": MSE}, R=50, S=20, lmbd=0.05, seed=None, device=None, n_jobs=None):
-        """
-        Args:
-            model_fn: callable returning fresh sklearn model instance
-            loss_fn: callable for loss (optional, e.g. MSE)
-            metrics: dict of metric functions
-            R: number of iterations
-            S: number of candidate neighbors per client
-            seed: random seed
-        """
+    def __init__(
+        self,
+        model_fn,
+        loss_fn=None,
+        metrics={"MSE_test": MSE},
+        R=50,
+        S=20,
+        lmbd=0.05,
+        seed=None,
+        device=None,
+        n_jobs=None,
+        # --- dynamic cluster participation ---
+        dynamic=False,
+        n_clusters=None,
+        n_active_clusters=None,
+        cluster_rotation_freq=1,
+    ):
         self.model_fn = model_fn
         self.loss_fn = loss_fn
         self.metrics = metrics
@@ -29,15 +38,20 @@ class Algorithm2_SKLearn:
         self.seed = seed
         self.n_jobs = n_jobs if n_jobs is not None else self._get_default_n_jobs()
 
+        self.dynamic = dynamic
+        self.n_clusters = n_clusters
+        self.n_active_clusters = n_active_clusters
+        self.cluster_rotation_freq = cluster_rotation_freq
+
         self.client_models = None
-        self.loss_history = None  # shape (n_clients, R)
+        self.loss_history = None
         self.metrics_history = {name: np.zeros(R) for name in metrics.keys()}
 
     def set_seed(self):
         if self.seed is not None:
             random.seed(self.seed)
             np.random.seed(self.seed)
-    
+
     def _get_default_n_jobs(self):
         return int(
             os.environ.get(
@@ -45,100 +59,137 @@ class Algorithm2_SKLearn:
                 os.environ.get("SLURM_CPUS_PER_TASK", os.cpu_count() or 1)
             )
         )
-    
-    def fit_candidate(self, j, X_cand, y_cand, X_test, y_test):
-        """
-        Fit a candidate model for client i using augmented data
-        """
-        new_model = self.model_fn(seed=self.seed+j)
-        X_aug = np.concatenate([X_cand, X_test])
-        y_aug = np.concatenate([
-            y_cand.reshape(-1),
-            y_test.reshape(-1)
-        ])
 
-        m, m_test = X_cand.shape[0], X_test.shape[0]
-        sample_weight = np.concatenate((np.ones((m,)), np.ones((m_test,)) * self.lmbd))
+    def sample_clients(self, n_clients, cluster_labels, active_clusters):
+        """Return indices of clients whose cluster is in active_clusters."""
+        return [i for i in range(n_clients) if cluster_labels[i] in active_clusters]
+
+    def fit_candidate(self, j, X_cand, y_cand, X_pub, y_pub):
+        """Fit a candidate model using augmented data (candidate data + pseudo-labelled public data)."""
+        seed_j = (self.seed + j) if self.seed is not None else None
+        new_model = self.model_fn(seed=seed_j)
+
+        X_aug = np.concatenate([X_cand, X_pub])
+        y_aug = np.concatenate([y_cand.reshape(-1), y_pub.reshape(-1)])
+
+        m, m_pub = X_cand.shape[0], X_pub.shape[0]
+        sample_weight = np.concatenate([np.ones(m)*self.lmbd, np.ones(m_pub)])
 
         new_model.fit(X_aug, y_aug, sample_weight=sample_weight)
         return new_model
 
-    def run(self, data):
-        """
-        Run Algorithm2 for sklearn models
-        Args:
-            data: dict with "train": (X_train, y_train), "val": (X_val, y_val)
-                  X_train: shape (n_clients, m_i, d), y_train: shape (n_clients, m_i)
-        Returns:
-            client_models: list of trained models
-        """
-        self.set_seed()
-        X_train, y_train = data["train"] # shapes: (n_clients, m_i, d), (n_clients, m_i)
-        X_val, y_val = data["val"]
+    def _eval_loss(self, model, X, y):
+        pred = model.predict(X)
+        return self.loss_fn(
+            torch.from_numpy(pred).reshape(-1, 1),
+            torch.as_tensor(y).reshape(-1, 1),
+        ).item()
 
-        X_test = np.random.normal(0, 1, size=(100, X_train.shape[2]))  # fixed test for data augmentation
+    def _eval_metric(self, model, X, y):
+        pred = model.predict(X)
+        results = {}
+        for name, fn in self.metrics.items():
+            results[name] = fn(
+                torch.from_numpy(pred).reshape(-1, 1),
+                torch.as_tensor(y).reshape(-1, 1),
+            ).item()
+        return results
+
+    def run(self, data):
+        self.set_seed()
+
+        X_train, y_train = data["train"]
+        X_test, y_test = data["test"]
+        cluster_labels = data.get("cluster_labels", None)
+
+        # Convert cluster_labels to a plain numpy int array for easy indexing
+        if cluster_labels is not None:
+            if isinstance(cluster_labels, torch.Tensor):
+                cluster_labels = cluster_labels.cpu().numpy()
+            cluster_labels = np.asarray(cluster_labels, dtype=int)
 
         n_clients = X_train.shape[0]
-        self.client_models = [self.model_fn(seed=self.seed+i) for i in range(n_clients)]
+        # public dataset is global and same for all iterations
+        X_pub = np.random.normal(0, 1, size=(100, X_train.shape[2]))
+
+        self.client_models = [
+            self.model_fn(seed=(self.seed + i) if self.seed is not None else None)
+            for i in range(n_clients)
+        ]
         self.loss_history = np.zeros((n_clients, self.R))
 
-        # init models with local training
+        # Initial local fit for every client
         for i in range(n_clients):
-                self.client_models[i].fit(X_train[i], y_train[i])  # local training step
+            self.client_models[i].fit(X_train[i], y_train[i])
+
+        # --- resolve dynamic cluster config ---
+        if self.dynamic and cluster_labels is not None:
+            n_clust = self.n_clusters or (int(cluster_labels.max()) + 1)
+            n_active = min(self.n_active_clusters or (n_clust - 1), n_clust)
+            use_dynamic = True
+        else:
+            use_dynamic = False
+
+        active_clusters = None
 
         for r in range(self.R):
-            # Step 2: sample candidate neighbors
-            candidate_indices = []
-            for i in range(n_clients):
-                pool = np.concatenate([np.arange(i), np.arange(i+1, n_clients)])
+
+            # --- determine selected clients for this round ---
+            if use_dynamic:
+                if active_clusters is None or r % self.cluster_rotation_freq == 0:
+                    active_clusters = set(
+                        np.random.choice(n_clust, n_active, replace=False).tolist()
+                    )
+                selected_list = self.sample_clients(n_clients, cluster_labels, active_clusters)
+            else:
+                selected_list = list(range(n_clients))
+
+            # Step 1: sample candidate neighbours from the selected pool only
+            candidate_pairs = []   # list of (client_i, array_of_candidate_indices)
+            for i in selected_list:
+                pool = [j for j in selected_list if j != i]
+                if not pool:
+                    continue
                 idx = np.random.choice(pool, min(self.S, len(pool)), replace=False)
-                candidate_indices.append(idx)
+                candidate_pairs.append((i, idx))
 
-            # Step 3: generate candidate models
-            all_candidate_models = []
-            for i in range(n_clients):
-                y_test = self.client_models[i].predict(X_test)  # pseudo-labels for test set
-                X_cand = X_train[candidate_indices[i]]
-                y_cand = y_train[candidate_indices[i]]
+            # Step 2: fit candidate models (only for selected clients)
+            all_candidate_models = {}
+            for i, cand_idx in candidate_pairs:
+                y_pub_i = self.client_models[i].predict(X_pub)
+                X_cand = X_train[cand_idx]
+                y_cand = y_train[cand_idx]
+
                 candidates = Parallel(n_jobs=self.n_jobs)(
-                        delayed(self.fit_candidate)(j, X_cand[j], y_cand[j], X_test, y_test)
-                        for j in range(len(X_cand))               
+                    delayed(self.fit_candidate)(j, X_cand[j], y_cand[j], X_pub, y_pub_i)
+                    for j in range(len(cand_idx))
                 )
-                all_candidate_models.append(candidates)
+                all_candidate_models[i] = candidates
 
-            # Step 4: select best candidates
-            for i in range(n_clients):
-                losses = []
-                for candidate in all_candidate_models[i]:
-                    pred = candidate.predict(X_train[i])
-                    # MSE loss works on torch tensors
-                    loss = self.loss_fn(torch.from_numpy(pred).reshape(-1,1), y_train[i].reshape(-1,1)).item()
-                    losses.append(loss)
+            # Step 3: select best candidate (only for selected clients)
+            for i, _ in candidate_pairs:
+                losses = [self._eval_loss(c, X_train[i], y_train[i])
+                          for c in all_candidate_models[i]]
+                best = int(np.argmin(losses))
+                self.client_models[i] = all_candidate_models[i][best]
+                self.loss_history[i, r] = losses[best]
 
-                best_idx = np.argmin(losses)
-                self.client_models[i] = all_candidate_models[i][best_idx]
-                self.loss_history[i, r] = losses[best_idx]
-
-            # Step 5: evaluate metrics on validation set
+            # Step 4: evaluate metrics on ALL clients (including inactive ones)
             metrics_sums = {name: 0.0 for name in self.metrics.keys()}
             for i in range(n_clients):
-                val_pred = self.client_models[i].predict(X_val[i])
-                for metric_name, metric_fn in self.metrics.items():
-                    metrics_sums[metric_name] += metric_fn(torch.from_numpy(val_pred).reshape(-1,1), y_val[i].reshape(-1,1)).item()
+                for name, val in self._eval_metric(self.client_models[i], X_test[i], y_test[i]).items():
+                    metrics_sums[name] += val
 
-            # store average metrics
-            for metric_name in self.metrics.keys():
-                self.metrics_history[metric_name][r] = metrics_sums[metric_name] / n_clients
-
+            for name in self.metrics.keys():
+                self.metrics_history[name][r] = metrics_sums[name] / n_clients
+        # Local training, used for baseline
         if self.R == 0:
-            # If R=0, evaluate local models on validation set
             self.metrics_history = {name: np.zeros(1) for name in self.metrics.keys()}
             metrics_sums = {name: 0.0 for name in self.metrics.keys()}
             for i in range(n_clients):
-                val_pred = self.client_models[i].predict(X_val[i])
-                for metric_name, metric_fn in self.metrics.items():
-                    metrics_sums[metric_name] += metric_fn(torch.from_numpy(val_pred).reshape(-1,1), y_val[i].reshape(-1,1)).item()
-            for metric_name in self.metrics.keys():
-                self.metrics_history[metric_name][0] = metrics_sums[metric_name] / n_clients
+                for name, val in self._eval_metric(self.client_models[i], X_test[i], y_test[i]).items():
+                    metrics_sums[name] += val
+            for name in self.metrics.keys():
+                self.metrics_history[name][0] = metrics_sums[name] / n_clients
 
         return self.client_models

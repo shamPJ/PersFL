@@ -3,7 +3,17 @@ import torch
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
-def generate_data(n_clusters, n_clients, n_samples, n_samples_val, n_features, noise_weight=0, noise_scale=1.0, seed=0):
+def generate_data(
+        n_clusters,
+        n_clients,
+        n_samples,
+        n_samples_test,
+        n_features,
+        noise_weight=0,
+        noise_scale=1.0,
+        seed=0,
+        no_scale=False,
+):
     assert n_clients % n_clusters == 0, "n_clients must be divisible by n_clusters"
 
     n_ds = n_clients // n_clusters
@@ -11,8 +21,8 @@ def generate_data(n_clusters, n_clients, n_samples, n_samples_val, n_features, n
 
     X_train = np.zeros((n_clients, n_samples, n_features))
     y_train = np.zeros((n_clients, n_samples, 1))
-    X_val = np.zeros((n_clients, n_samples_val, n_features))
-    y_val = np.zeros((n_clients, n_samples_val, 1))
+    X_test = np.zeros((n_clients, n_samples_test, n_features))
+    y_test = np.zeros((n_clients, n_samples_test, 1))
     true_weights = np.zeros((n_clusters, n_features))
 
     rng = np.random.default_rng(seed)
@@ -26,38 +36,39 @@ def generate_data(n_clusters, n_clients, n_samples, n_samples_val, n_features, n
 
         # Generate data for all clients in this cluster
         for j in range(n_ds):
-            X = rng.normal(0, 1, size=(n_samples + n_samples_val, n_features))
-            noise = rng.normal(0, noise_scale, size=(n_samples + n_samples_val, 1))
+            X = rng.normal(0, 1, size=(n_samples + n_samples_test, n_features))
+            noise = rng.normal(0, noise_scale, size=(n_samples + n_samples_test, 1))
             noise_w = rng.normal(0, noise_weight, size=(n_features, 1))
             y = X @ (w + noise_w) + noise
 
-            X_t, X_v, y_t, y_v = train_test_split(X, y, train_size=n_samples, test_size=n_samples_val, random_state=seed + i*n_ds + j)
+            X_t, X_v, y_t, y_v = train_test_split(X, y, train_size=n_samples, test_size=n_samples_test, random_state=seed + i*n_ds + j)
             cluster_X_train.append(X_t)
             cluster_node_data.append((X_t, X_v, y_t, y_v))
 
-        # Fit scaler on all cluster training data
-        scaler = StandardScaler()
-        scaler.fit(np.vstack(cluster_X_train))
+        if not no_scale:
+            scaler = StandardScaler()
+            scaler.fit(np.vstack(cluster_X_train))
+            true_weights[i] = w.reshape(-1,) * scaler.scale_
 
-        # Transform each client
         for idx, (X_t, X_v, y_t, y_v) in enumerate(cluster_node_data):
-            X_train[i*n_ds + idx] = scaler.transform(X_t)
-            X_val[i*n_ds + idx] = scaler.transform(X_v)
+            X_train[i*n_ds + idx] = scaler.transform(X_t) if not no_scale else X_t
+            X_test[i*n_ds + idx] = scaler.transform(X_v) if not no_scale else X_v
 
             y_train[i*n_ds + idx] = y_t
-            y_val[i*n_ds + idx] = y_v
+            y_test[i*n_ds + idx] = y_v
 
             cluster_labels.append(i)
         
-    
     X_train = torch.as_tensor(X_train, dtype=torch.float32)
     y_train = torch.tensor(y_train, dtype=torch.float32)
-    X_val = torch.as_tensor(X_val, dtype=torch.float32)
-    y_val = torch.tensor(y_val, dtype=torch.float32)
+    X_test = torch.as_tensor(X_test, dtype=torch.float32)
+    y_test = torch.tensor(y_test, dtype=torch.float32)
+    true_weights = torch.tensor(true_weights, dtype=torch.float32)
 
     return {
         "train": (X_train, y_train),
-        "val": (X_val, y_val),
+        "test": (X_test, y_test),
         "cluster_labels": cluster_labels,
-        "true_weights": true_weights
+        "true_weights": true_weights,
+        "noise_scale": noise_scale,
     }
